@@ -84,11 +84,6 @@ int main(void) {
   CUDA_SAFE_CALL(cuModuleLoadDataEx(&module, ptx, 0, 0, 0));
   CUDA_SAFE_CALL(cuModuleGetFunction(&kernel, module, KERNEL_NAME));
 
-
-  int deviceId;
-  cudaGetDevice(&deviceId);
-  std::cout << deviceId << " <- device id\n";
-
   // Setup input and output buffers
   size_t n = NUM_THREADS * NUM_BLOCKS;
   size_t bufferSize = n * sizeof(float);
