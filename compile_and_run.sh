@@ -7,6 +7,4 @@ cd build
 
 cmake ..
 
-make
-
-./launch_kernel_test
+make && ./launch_kernel_test
