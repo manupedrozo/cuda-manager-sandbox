@@ -1,3 +1,12 @@
-g++ main.cpp cuda_manager.cpp cuda_compiler.cpp -o main -lnvrtc -lcuda
+if [ ! -d "build" ] 
+then
+    mkdir build
+fi
 
-./main
+cd build
+
+cmake ..
+
+make
+
+./launch_kernel_test
