@@ -1,3 +1,3 @@
-g++ cuda_manager_test.cpp cuda_manager.cpp -o cuda_test -lnvrtc -lcuda
+g++ main.cpp cuda_manager.cpp cuda_compiler.cpp -o main -lnvrtc -lcuda
 
-./cuda_test
+./main

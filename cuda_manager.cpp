@@ -1,7 +1,6 @@
 #include "cuda_manager.h"
 #include <cuda.h>
-#include <nvrtc.h>
-#include <fstream>
+#include <vector>
 #include <iostream>
 
 CudaManager::CudaManager() {
@@ -9,12 +8,11 @@ CudaManager::CudaManager() {
   CUDA_SAFE_CALL(cuInit(0));
 
   // Get devices info
-  int device_count = 0;
-  CUDA_SAFE_CALL(cuDeviceGetCount(&device_count));
+  CUDA_SAFE_CALL(cuDeviceGetCount((int *)&device_count));
   std::cout << "Device count: " << device_count << '\n'; 
 
-  CUdevice  devices[device_count];
-  CUcontext contexts[device_count];
+  devices = new CUdevice[device_count]();
+  contexts = new CUcontext[device_count]();
 
   int major = 0, minor = 0;
   char device_name[256];
@@ -30,75 +28,79 @@ CudaManager::CudaManager() {
     // Initialize context for device
     CUDA_SAFE_CALL(cuCtxCreate(&contexts[i], i, devices[i]));
   }
-
-  // We are only using one device & context for now
-  context = contexts[0];
-  device = devices[0];
-
 }
 
 CudaManager::~CudaManager() {
   std::cout << "Destructing CUDA Manager...\n";
-  CUDA_SAFE_CALL(cuCtxDestroy(context));
+  for (int i = 0; i < device_count; ++i) {
+    CUDA_SAFE_CALL(cuCtxDestroy(contexts[i]));
+  }
 }
 
-void CudaManager::compile_to_ptx(const char *source_path, char **result_ptx) {
-  std::cout << "Compiling cuda kernel file [" << source_path << "]...\n";
-  // Read kernel file
-  std::ifstream input_file(source_path, std::ifstream::in | std::ifstream::ate);
+void CudaManager::launch_kernel(const CUfunction kernel, const std::vector<Arg> args, const uint32_t num_blocks, const uint32_t num_threads) {
+  // Set context where to launch the kernel
+  CUDA_SAFE_CALL(cuCtxSetCurrent(contexts[0])); // TODO move this
 
-  if (!input_file.is_open()) {
-    std::cerr << "Unable to open file\n";
-    exit(1);
+  void *kernel_args[args.size()]; // Args to be passed on kernel launch
+  std::vector<CudaBuffer *> buffers; // Keep track of buffers 
+
+  std::cout << "Parsing arguments...\n";
+  for (int i = 0; i < args.size(); ++i) {
+    Arg arg = args[i];
+    if (arg.is_buffer) {
+      // Create cuda buffer and copy to device if its an input buffer
+      // New allocation since we need to pass pointers
+      CudaBuffer *cuda_buffer = new CudaBuffer();
+      cuda_buffer->h_ptr = arg.base_ptr;
+      cuda_buffer->size  = arg.size;
+      cuda_buffer->is_in = arg.is_in;
+      
+      CUDA_SAFE_CALL(cuMemAlloc(&cuda_buffer->d_ptr, cuda_buffer->size));
+
+      std::cout << "Buffer arg: h_ptr = " << cuda_buffer->h_ptr << 
+                             "  size = " << cuda_buffer->size << 
+                             "  is_in = " << cuda_buffer->is_in << 
+                             "  d_ptr = " << cuda_buffer->d_ptr << "\n";
+
+      if (cuda_buffer->is_in) {
+        std::cout << "Copied HtoD " << cuda_buffer->h_ptr << " to " << cuda_buffer->d_ptr << "\n";
+        CUDA_SAFE_CALL(cuMemcpyHtoD(cuda_buffer->d_ptr, cuda_buffer->h_ptr, cuda_buffer->size));
+      }
+
+      kernel_args[i] = (void *) &cuda_buffer->d_ptr;
+      buffers.push_back(cuda_buffer);
+    }
+    else {
+      std::cout << "Scalar arg: value = " << arg.value << "\n";
+
+      // Use address of the argument in the original array
+      kernel_args[i] = (void *) &args[i].value;
+    }
   }
 
-  size_t input_size = (size_t)input_file.tellg();
-  char *kernel_string = new char[input_size + 1];
+  std::cout << "Executing...\n";
+  // Execute
+  CUDA_SAFE_CALL(
+      cuLaunchKernel(kernel, 
+        num_blocks, 1, 1, // grid dim 
+        num_threads, 1, 1, // block dim
+        0, NULL, // shared mem, stream
+        kernel_args, 0) // args, extras
+      );
 
-  input_file.seekg(0, std::ifstream::beg);
-  input_file.read(kernel_string, input_size);
-  input_file.close();
+  // Syncronize
+  CUDA_SAFE_CALL(cuCtxSynchronize());
 
-  kernel_string[input_size] = '\x0';
+  std::cout << "Execution complete!\n";
 
-  // Create nvrtc program for compilation
-  nvrtcProgram prog;
-  // TODO Check if program name (3rd param) is needed, "default_program" is used when null.
-  NVRTC_SAFE_CALL(
-      nvrtcCreateProgram(&prog, kernel_string, NULL, 0, NULL, NULL) 
-  );
-
-  delete[] kernel_string;
-
-  // Compilation options
-  const char *opts[] = {"--fmad=false"};
-  // Compile the program
-  nvrtcResult compile_result = nvrtcCompileProgram(prog, 1, opts);
-
-  // Get compilation log
-  size_t log_size;
-  NVRTC_SAFE_CALL(
-    nvrtcGetProgramLogSize(prog, &log_size)
-  );
-  char *log = new char[log_size];
-  NVRTC_SAFE_CALL(nvrtcGetProgramLog(prog, log));
-  std::cout << log;
-  delete[] log;
-
-  if (compile_result != NVRTC_SUCCESS) {
-    exit(1);
+  // Copy back to host and free host/device memory
+  for (CudaBuffer *cuda_buffer: buffers) {
+    if (!cuda_buffer->is_in) {
+      std::cout << "Copied DtoH " << cuda_buffer->d_ptr << " to " << cuda_buffer->h_ptr << "\n";
+      CUDA_SAFE_CALL(cuMemcpyDtoH(cuda_buffer->h_ptr, cuda_buffer->d_ptr, cuda_buffer->size));
+    }
+    std::cout << "Deallocated " << cuda_buffer->d_ptr << "\n";
+    CUDA_SAFE_CALL(cuMemFree(cuda_buffer->d_ptr));
+    free(cuda_buffer);
   }
-  std::cout << "Compilation successful\n";
-
-  // Get PTX from the program
-  size_t ptx_size;
-  NVRTC_SAFE_CALL(nvrtcGetPTXSize(prog, &ptx_size));
-  char *ptx = new char[ptx_size];
-  NVRTC_SAFE_CALL(nvrtcGetPTX(prog, ptx));
-
-  *result_ptx = ptx;
-
-  // Destroy the program
-  NVRTC_SAFE_CALL(nvrtcDestroyProgram(&prog));
 }
-
