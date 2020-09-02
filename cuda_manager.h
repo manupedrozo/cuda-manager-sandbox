@@ -1,25 +1,6 @@
+#include "cuda_common.h"
 #include <cuda.h>
 #include <vector>
-
-#define CUDA_SAFE_CALL(x)                                         \
-  do {                                                            \
-    CUresult result = x;                                          \
-    if (result != CUDA_SUCCESS) {                                 \
-      const char *msg;                                            \
-      cuGetErrorName(result, &msg);                               \
-      std::cerr << "error: " #x " failed with error "             \
-                << msg << '\n';                                   \
-      exit(1);                                                    \
-    }                                                             \
-  } while(0)
-
-struct Arg {
-  float value; // TODO add support for other scalars
-  void *base_ptr;
-  size_t size;
-  bool is_buffer;
-  bool is_in;
-};
 
 // Struct to keep track of buffers
 struct CudaBuffer {

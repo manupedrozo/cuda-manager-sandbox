@@ -1,4 +1,5 @@
 .ignore
+build
 
 ### C ###
 # Prerequisites
@@ -236,4 +237,3 @@ tags
 # Persistent undo
 [._]*.un~
 
-build

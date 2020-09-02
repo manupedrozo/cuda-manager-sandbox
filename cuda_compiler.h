@@ -1,14 +1,5 @@
+#include "cuda_common.h"
 #include <nvrtc.h>
-
-#define NVRTC_SAFE_CALL(x)                                        \
-  do {                                                            \
-    nvrtcResult result = x;                                       \
-    if (result != NVRTC_SUCCESS) {                                \
-      std::cerr << "error: " #x " failed with error "             \
-                << nvrtcGetErrorString(result) << '\n';           \
-      exit(1);                                                    \
-    }                                                             \
-  } while(0)
 
 
 /*! \brief A class for cuda kernel compilation.

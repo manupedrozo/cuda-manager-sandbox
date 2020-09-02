@@ -2,7 +2,7 @@ cmake_minimum_required (VERSION 2.8.11)
 
 project(cuda_sandbox LANGUAGES CXX CUDA)
 
-add_executable(launch_kernel_test main.cpp cuda_manager.cpp cuda_compiler.cpp)
+add_executable(launch_kernel_test main.cpp cuda_manager.cpp cuda_compiler.cpp cuda_argument_parser.cpp)
 
 find_library(CUDA_LIBRARY cuda ${CMAKE_CUDA_IMPLICIT_LINK_DIRECTORIES})
 find_library(NVRTC_LIBRARY nvrtc ${CMAKE_CUDA_IMPLICIT_LINK_DIRECTORIES})
