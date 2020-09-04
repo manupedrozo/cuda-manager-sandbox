@@ -86,7 +86,7 @@ bool parse_integer(int *position, const char *arguments, int *result) {
   return false;
 }
 
-bool parse_arguments(const char *arguments, std::vector<Arg> &args, char **kernel_path) {
+bool parse_arguments(const char *arguments, std::vector<Arg *> &args, char **kernel_path) {
   std::cout << "Parsing arguments: " << arguments << '\n';
 
   int i = 0;
@@ -95,9 +95,6 @@ bool parse_arguments(const char *arguments, std::vector<Arg> &args, char **kerne
   size_t kernel_path_size = sizeof(char) * (kernel_path_s.size() + 1);
   *kernel_path = (char *) malloc(kernel_path_size);
   strncpy(*kernel_path, kernel_path_s.c_str(), kernel_path_s.size() + 1);
-
-  std::cout << *kernel_path << "\n";
-  std::cout << kernel_path_s << "\n";
 
   // Rest of the arguments
   bool is_number;
@@ -133,7 +130,7 @@ bool parse_arguments(const char *arguments, std::vector<Arg> &args, char **kerne
         void *ptr;
         parse_correct = parse_pointer(&(++i), arguments, &ptr, true);
 
-        Arg arg = {0, ptr, (size_t)size, true, is_in};
+        Arg *arg = new BufferArg(ptr, (size_t)size, is_in);
         args.push_back(arg);
 
         std::cout << "Buffer: is_in = " << is_in << " size = " << size << " ptr = " << ptr << '\n';
@@ -141,8 +138,8 @@ bool parse_arguments(const char *arguments, std::vector<Arg> &args, char **kerne
 
       // Number
       else if (is_number) {
-        float value = std::stof(current_arg);
-        Arg arg = {value, nullptr, sizeof(float), false, true};
+        float value = std::stof(current_arg); // TODO support multiple types
+        Arg *arg = new ValueArg<float>(value, sizeof(float), true);
         args.push_back(arg);
         std::cout << "Number: " << current_arg << '\n';
       }
@@ -159,24 +156,25 @@ bool parse_arguments(const char *arguments, std::vector<Arg> &args, char **kerne
   return true;
 }
 
-std::string args_to_string(std::string kernel_path, std::vector<Arg> args) {
+std::string args_to_string(std::string kernel_path, std::vector<Arg *> args) {
 	std::stringstream ss;
   ss << kernel_path;
 
-  for (Arg arg: args) {
-    if (arg.is_buffer) {
-      ss << " b " << arg.is_in << ' ' << arg.size << ' ' << std::hex << arg.base_ptr;
+  for (Arg *arg: args) {
+    if (arg->is_buffer) {
+      ss << " b " << arg->is_in << ' ' << arg->size << ' ' << std::hex << arg->get_value_ptr() << std::dec;
     } else {
-      ss << ' ' << arg.value;
+      // Using only float since this is for testing purposes
+      ss << ' ' << *(float *)arg->get_value_ptr();
     }
   }
   
   return ss.str();
 }
 
-void print_args(std::vector<Arg> args) {
+void print_args(std::vector<Arg *> args) {
   int i = 0;
-  for (Arg arg: args) {
-    std::cout << ++i << ") is_buffer = " << arg.is_buffer << " value = " << arg.value << " size = " << arg.size << " ptr = " << arg.base_ptr << " is_in = " << arg.is_in << '\n';
+  for (Arg *arg: args) {
+    std::cout << ++i << ") is_buffer = " << arg->is_buffer << " value = " << arg->get_value_ptr() << " size = " << arg->size << " ptr = " << arg->get_value_ptr() << " is_in = " << arg->is_in << '\n';
   }
 }

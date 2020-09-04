@@ -28,12 +28,46 @@
   } while(0)
 
 
-struct Arg {
-  float value; // TODO add support for other scalars and strings
-  void *base_ptr;
+class Arg {
+  public:
   size_t size;
   bool is_buffer;
   bool is_in;
+
+  Arg(size_t size, bool is_buffer, bool is_in) {
+    this->size = size;
+    this->is_buffer = is_buffer;
+    this->is_in = is_in;
+  }
+
+  virtual void *get_value_ptr() { return nullptr; }
+};
+
+template <class T>
+class ValueArg : public Arg {
+  public:
+    T value;
+
+    ValueArg(T value, size_t size, bool is_in): Arg(size, false, is_in) {
+      this->value = value;
+    }
+
+    virtual void *get_value_ptr() {
+      return (void *) &value;
+    }
+};
+
+class BufferArg : public Arg {
+  public:
+    void *value;
+
+    BufferArg(void *value, size_t size, bool is_in): Arg(size, true, is_in) {
+      this->value = value;
+    }
+
+    virtual void *get_value_ptr() {
+      return value;
+    }
 };
 
 #endif

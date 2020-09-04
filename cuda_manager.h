@@ -16,7 +16,7 @@ class CudaManager {
 public:
   CudaManager();
   ~CudaManager();
-  void launch_kernel(const CUfunction kernel, const std::vector<Arg> args, const uint32_t num_blocks, const uint32_t num_threads);
+  void launch_kernel(const CUfunction kernel, const std::vector<Arg *> args, const uint32_t num_blocks, const uint32_t num_threads);
 
   uint32_t device_count = 0;
   // (Device, Context) pairs

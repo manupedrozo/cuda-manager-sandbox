@@ -12,7 +12,7 @@
  * \note Allocates memory for kernel_path
  * \return true if successful
  */
-bool parse_arguments(const char *arguments, std::vector<Arg> &args, char **kernel_path);
+bool parse_arguments(const char *arguments, std::vector<Arg *> &args, char **kernel_path);
 
-std::string args_to_string(std::string kernel_path, std::vector<Arg> args);
-void print_args(std::vector<Arg> args);
+std::string args_to_string(std::string kernel_path, std::vector<Arg *> args);
+void print_args(std::vector<Arg *> args);

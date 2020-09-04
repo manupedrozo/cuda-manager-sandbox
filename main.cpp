@@ -32,13 +32,13 @@ void test_arg_parser() {
     y[i] = static_cast<float>(i * 2);
   }
 
-  Arg arg_a = {a, NULL, sizeof(float), false, true};
-  Arg arg_x = {0, x, buffer_size, true, true};
-  Arg arg_y = {0, y, buffer_size, true, true};
-  Arg arg_o = {0, o, buffer_size, true, false};
-  Arg arg_n = {(float)n, NULL, sizeof(size_t), false, true};
+  ValueArg<float>  arg_a(a, sizeof(float), true);
+  BufferArg arg_x(x, buffer_size, true);
+  BufferArg arg_y(y, buffer_size, true);
+  BufferArg arg_o(o, buffer_size, false);
+  ValueArg<float> arg_n(n, sizeof(float), true);
 
-  std::vector<Arg> args {arg_a, arg_x, arg_y, arg_o, arg_n};
+  std::vector<Arg *> args {&arg_a, &arg_x, &arg_y, &arg_o, &arg_n};
 
   // Arguments to a string
   std::cout << "Arguments to string: \n";
@@ -46,7 +46,7 @@ void test_arg_parser() {
   const char *arguments = _arguments.c_str();
 
   // Parse arguments back from the string
-  std::vector<Arg> parsed_args;
+  std::vector<Arg *> parsed_args;
   char *kernel_path;
   bool succ = parse_arguments(arguments, parsed_args, &kernel_path);
 
@@ -78,6 +78,7 @@ void test_arg_parser() {
   }
 
   // Free resources
+  for (Arg *arg : parsed_args) { free(arg); }
   CUDA_SAFE_CALL(cuModuleUnload(module));
   delete[] x;
   delete[] y;
@@ -110,13 +111,13 @@ void manager_launch_kernel_test() {
     y[i] = static_cast<float>(i * 2);
   }
 
-  Arg arg_a = {a, NULL, sizeof(float), false, true};
-  Arg arg_x = {0, x, buffer_size, true, true};
-  Arg arg_y = {0, y, buffer_size, true, true};
-  Arg arg_o = {0, o, buffer_size, true, false};
-  Arg arg_n = {(float)n, NULL, sizeof(size_t), false, true};
+  ValueArg<float>  arg_a(a, sizeof(float), true);
+  BufferArg arg_x(x, buffer_size, true);
+  BufferArg arg_y(y, buffer_size, true);
+  BufferArg arg_o(o, buffer_size, false);
+  ValueArg<size_t> arg_n(n, sizeof(size_t), true);
 
-  std::vector<Arg> args {arg_a, arg_x, arg_y, arg_o, arg_n};
+  std::vector<Arg *> args {&arg_a, &arg_x, &arg_y, &arg_o, &arg_n};
 
   cuda_manager.launch_kernel(kernel, args, NUM_BLOCKS, NUM_THREADS);
 
@@ -204,5 +205,5 @@ void manual_launch_kernel_test() {
 int main(void) {
   test_arg_parser();
   manager_launch_kernel_test();
-  manual_launch_kernel_test();
+  //manual_launch_kernel_test();
 }

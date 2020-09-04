@@ -38,7 +38,7 @@ CudaManager::~CudaManager() {
   }
 }
 
-void CudaManager::launch_kernel(const CUfunction kernel, const std::vector<Arg> args, const uint32_t num_blocks, const uint32_t num_threads) {
+void CudaManager::launch_kernel(const CUfunction kernel, const std::vector<Arg *> args, const uint32_t num_blocks, const uint32_t num_threads) {
   // Set context where to launch the kernel
   CUDA_SAFE_CALL(cuCtxSetCurrent(contexts[0])); // TODO move this
 
@@ -47,16 +47,16 @@ void CudaManager::launch_kernel(const CUfunction kernel, const std::vector<Arg> 
 
   std::cout << "Parsing arguments...\n";
   for (int i = 0; i < args.size(); ++i) {
-    Arg arg = args[i];
-    if (arg.is_buffer) {
+    Arg *arg = args[i];
+    if (arg->is_buffer) {
       // Create cuda buffer and copy to device if its an input buffer
       // The buffer must be created inside the vector and then used as a reference
       // This allows us to use pointers to its members (d_ptr)
       buffers.push_back(CudaBuffer());
       CudaBuffer &cuda_buffer = buffers[buffers.size() - 1];
-      cuda_buffer.h_ptr = arg.base_ptr;
-      cuda_buffer.size  = arg.size;
-      cuda_buffer.is_in = arg.is_in;
+      cuda_buffer.h_ptr = arg->get_value_ptr();
+      cuda_buffer.size  = arg->size;
+      cuda_buffer.is_in = arg->is_in;
       
       CUDA_SAFE_CALL(cuMemAlloc(&cuda_buffer.d_ptr, cuda_buffer.size));
 
@@ -73,10 +73,12 @@ void CudaManager::launch_kernel(const CUfunction kernel, const std::vector<Arg> 
       kernel_args[i] = (void *) &cuda_buffer.d_ptr;
     }
     else {
-      std::cout << "Scalar arg: value = " << arg.value << "\n";
+      // Might print incorrect value since we are assuming float, but checking type is overkill
+      std::cout << "Scalar arg: value = " << *(float *)arg->get_value_ptr() << 
+                              " ptr = " << arg->get_value_ptr() << "\n";
 
       // Use address of the argument in the original array
-      kernel_args[i] = (void *) &args[i].value;
+      kernel_args[i] = args[i]->get_value_ptr();
     }
   }
 
