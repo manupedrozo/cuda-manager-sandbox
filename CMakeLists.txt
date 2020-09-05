@@ -25,3 +25,5 @@ install (FILES ${HEADERS}
 install (TARGETS cuda_mango LIBRARY DESTINATION ${MANGO_ROOT}/lib)
 
 configure_file(saxpy.cu saxpy.cu COPYONLY)
+
+add_subdirectory(daemon)

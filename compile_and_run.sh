@@ -1,10 +1,1 @@
-if [ ! -d "build" ] 
-then
-    mkdir build
-fi
-
-cd build
-
-cmake ..
-
-make && ./launch_kernel_test
+./compile.sh && cd build && ./launch_kernel_test
