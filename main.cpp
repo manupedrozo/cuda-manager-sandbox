@@ -203,7 +203,7 @@ void manual_launch_kernel_test() {
 }
 
 int main(void) {
-  test_arg_parser();
+  // test_arg_parser();
   manager_launch_kernel_test();
   //manual_launch_kernel_test();
 }

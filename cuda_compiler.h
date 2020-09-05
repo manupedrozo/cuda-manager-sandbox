@@ -1,6 +1,4 @@
 #include "cuda_common.h"
-#include <nvrtc.h>
-
 
 /*! \brief A class for cuda kernel compilation.
  */
