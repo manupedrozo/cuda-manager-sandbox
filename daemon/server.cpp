@@ -4,15 +4,26 @@
 #include <stdio.h> 
 #include <sys/socket.h> 
 #include <sys/types.h>
+#include <poll.h>
 #include <sys/un.h>
 #include <stdlib.h> 
 #include <string.h> 
+#include <errno.h>
+#include <iostream>
 
 #include "commands.h"
 
 #define SOCKET_PATH "/tmp/server-test"
 
 #define BUFFER_SIZE 1024
+#define NO_SOCKET -1
+
+#define MAX_CONNECTIONS 10 // Max client connections
+#define POLLFDS_SIZE MAX_CONNECTIONS + 1 // Clients + listen socket
+
+static bool running = true;
+
+static pollfd pollfds[POLLFDS_SIZE]; 
 
 void handle_hello_command(const cuda_mango::hello_command_t *cmd) {
     printf("%s\n", cmd->message);
@@ -20,7 +31,7 @@ void handle_hello_command(const cuda_mango::hello_command_t *cmd) {
 
 void handle_end_command(const cuda_mango::command_base_t *cmd) {
     (void) (cmd);
-    exit(EXIT_SUCCESS);
+    running = false;
 }
 
 void handle_commands(const char *buffer, ssize_t size) {
@@ -43,13 +54,73 @@ void handle_commands(const char *buffer, ssize_t size) {
     }
 }
 
+void initialize_pollfds() {
+    for (int i = 0; i < POLLFDS_SIZE; i++) {
+        pollfds[i].fd = NO_SOCKET;
+        pollfds[i].events = 0;
+        pollfds[i].revents = 0;
+    }
+}
+
+void close_sockets() {
+    for(int i = 0; i < POLLFDS_SIZE; i++) {
+        if(pollfds[i].fd != NO_SOCKET) {
+            close(pollfds[i].fd);
+        }
+    }
+}
+
+void accept_new_connection() {
+    int server_fd = pollfds[0].fd;
+    int new_socket = accept(server_fd, NULL, NULL);
+    if (new_socket < 0) {
+        perror("accept");
+        exit(EXIT_FAILURE);
+    }
+    for(int i = 1; i < POLLFDS_SIZE; i++) {
+        if(pollfds[i].fd == NO_SOCKET) {
+            pollfds[i].fd = new_socket;
+            pollfds[i].events = POLLIN | POLLPRI | POLLOUT;
+            pollfds[i].revents = 0;
+            break;
+        }
+    }
+}
+
+void receive_on_socket(int fd) {
+    char buffer[BUFFER_SIZE];
+    ssize_t bytes_read = recv(fd, &buffer, BUFFER_SIZE, 0);
+    if (bytes_read < 0) {
+        perror("read");
+        exit(EXIT_FAILURE);
+    }
+    printf("Bytes read:%li\n", bytes_read);
+
+    handle_commands(buffer, bytes_read);
+
+    // SHOULD NOT ACTUALLY DO THIS HERE
+    // We need to buffer responses until we can write on the socket (POLLOUT)
+    cuda_mango::command_base_t response = cuda_mango::create_ack_command();
+    if (send(fd, &response, sizeof(response), MSG_NOSIGNAL) < 0) {
+        if (errno == EPIPE) {
+            printf("Socket disconnected\n"); // What do we do here?
+            exit(EXIT_FAILURE);
+        } else {
+            perror("send");
+            exit(EXIT_FAILURE);
+        }
+    } else {
+        printf("Ack sent\n");
+    }
+}
+
 int main(int argc, char const *argv[]) 
 { 
-    int server_fd, new_socket, valread; 
+    initialize_pollfds();
+    
+    int &server_fd = pollfds[0].fd;
+    pollfds[0].events = POLLIN | POLLPRI;
     struct sockaddr_un address; 
-    int opt = 1; 
-    int addrlen = sizeof(address); 
-    char *hello = "Hello from server"; 
        
     // Creating socket file descriptor 
     if ((server_fd = socket(AF_UNIX, SOCK_STREAM, 0)) == 0) 
@@ -75,34 +146,51 @@ int main(int argc, char const *argv[])
         exit(EXIT_FAILURE); 
     } 
 
-    char buffer[BUFFER_SIZE];
-
     int loop = 0;
 
-    while(1) {
-        if ((new_socket = accept(server_fd, (struct sockaddr *)&address, (socklen_t*)&addrlen))<0) 
-        { 
-            perror("accept"); 
-            exit(EXIT_FAILURE); 
-        } 
-        printf("loop %d\n", loop++);
-        ssize_t bytes_read = read(new_socket, &buffer, BUFFER_SIZE);
-        if (bytes_read < 0) {
-            perror("read");
+    char continue_buf[8];
+    while(running) {
+        int events = poll(pollfds, POLLFDS_SIZE, -1);
+
+        if (events == -1) {
+            perror("poll");
             exit(EXIT_FAILURE);
         }
 
-        handle_commands(buffer, bytes_read);
+        for(int i = 0, events_left = events; i < POLLFDS_SIZE && events_left > 0; i++) {
+            if(pollfds[i].revents) {
+                auto socket_events = pollfds[i].revents;
+                if(socket_events & POLLIN) { // Ready to read
+                    if(i == 0) { // Listen socket, new connection available
+                        accept_new_connection();
+                    } else {
+                        receive_on_socket(pollfds[i].fd);
+                    }
+                }
+                if(socket_events & POLLOUT) { // Ready to write
+                    // Should send buffered messages for each socket here
+                }
+                if(socket_events & POLLPRI) { // Exceptional condition (very rare)
+                    printf("Exceptional condition on idx %d\n", i);
+                }
+                if(socket_events & POLLERR) { // Error / read end of pipe is closed
+                    printf("Error on idx %d\n", i); // errno?
+                }
+                if(socket_events & POLLHUP) { // Other end closed connection, some data may be left to read
+                    printf("Got hang up on %d\n", i);
+                }
+                if(socket_events & POLLNVAL) { // Invalid request, fd not open
+                    printf("Socket %d at index %d is closed\n", pollfds[i].fd, i);
+                    exit(EXIT_FAILURE);
+                }
+                pollfds[i].revents = 0;
+                events_left--;
+            }
+        }
+    }     
 
-        cuda_mango::command_base_t response = cuda_mango::create_ack_command();
-        if (send(new_socket, &response, sizeof(response), 0) < 0) {
-            perror("send");
-            exit(EXIT_FAILURE);
-        } 
-        printf("Hello message sent\n");
-    }
+    printf("Finishing up\n");
+    close_sockets();
 
-    printf("Here!");
-     
     return 0; 
 } 

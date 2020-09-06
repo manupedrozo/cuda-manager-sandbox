@@ -8,6 +8,8 @@
 #include <string.h> 
 #include <stdlib.h> 
 
+#include <iostream>
+
 #include "commands.h"
 
 #define SOCKET_PATH "/tmp/server-test"
@@ -32,28 +34,27 @@ int main(int argc, char const *argv[])
         return EXIT_FAILURE; 
     } 
 
-    cuda_mango::hello_command_t hello_cmd = cuda_mango::create_hello_command(hello);
+    while (1) {
+        printf("Type your message\n");
+        char msg_buf[128];
 
-    cuda_mango::command_base_t res;
+        std::cin >> msg_buf;
 
-    if(send(sock, &hello_cmd, sizeof(hello_cmd), 0) < 0) {
-        perror("send");
-        return EXIT_FAILURE;
-    } 
+        printf("Message: %s\n", msg_buf);
+        cuda_mango::hello_command_t hello_cmd = cuda_mango::create_hello_command(msg_buf);
 
-    printf("Hello message sent\n"); 
+        cuda_mango::command_base_t res;
 
-    valread = recv(sock, &res, sizeof(res), 0); 
-    if(valread < 0) {
-        perror("read");
-        return EXIT_FAILURE;
+        send(sock, &hello_cmd, sizeof(hello_cmd), 0); 
+        printf("Hello message sent\n"); 
+        valread = recv(sock, &res, sizeof(res), 0); 
+        if (res.cmd == cuda_mango::ACK) {
+            printf("Server ack received\n");
+        } else {
+            return EXIT_FAILURE;
+        }
     }
-
-    if (res.cmd == cuda_mango::ACK) {
-        printf("Server ack received\n");
-    } else {
-        return EXIT_FAILURE;
-    }
+    
 
     close(sock);
     

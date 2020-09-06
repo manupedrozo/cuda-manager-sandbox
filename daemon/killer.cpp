@@ -34,6 +34,8 @@ int main(int argc, char const *argv[])
 
     send(sock, &cmd, sizeof(cmd), 0); 
     printf("Killing server\n"); 
+
+    close(sock);
     
     return 0; 
 } 
