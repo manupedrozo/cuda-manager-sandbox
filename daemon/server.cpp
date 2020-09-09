@@ -9,7 +9,7 @@
 #include <string.h> 
 #include <errno.h>
 #include <iostream>
-#include <vector>
+#include <queue>
 
 #include "commands.h"
 
@@ -24,12 +24,18 @@
 static bool running = true;
 
 typedef struct {
-    void* buf;
+    void *buf;
     size_t size;
 } message_t;
 
-static pollfd pollfds[POLLFDS_SIZE]; 
-static std::vector<message_t> message_queues[POLLFDS_SIZE]; // listen socket does not need to write, so we can use MAX_CONNECTIONS here, the difference could be confusing
+typedef struct {
+    message_t *msg;
+    size_t byte_offset;
+} sending_message_t;
+
+static pollfd                   pollfds[POLLFDS_SIZE]; 
+static std::queue<message_t *>  message_queues[POLLFDS_SIZE]; // listen socket does not need to write, so we can use MAX_CONNECTIONS here, the difference could be confusing
+static sending_message_t        messages_in_progress[POLLFDS_SIZE];
 
 void handle_hello_command(const cuda_mango::hello_command_t *cmd) {
     printf("%s\n", cmd->message);
@@ -111,34 +117,52 @@ void receive_on_socket(int fd_idx) {
     }
     else if(bytes_read == 0) return;
 
-    printf("Bytes read:%li\n", bytes_read);
+    printf("Bytes received: %li\n", bytes_read);
 
     handle_commands(buffer, bytes_read);
 
     cuda_mango::command_base_t *response = (cuda_mango::command_base_t *) malloc(sizeof(cuda_mango::command_base_t));
     response->cmd = cuda_mango::ACK;
-    message_queues[fd_idx].push_back({response, sizeof(cuda_mango::command_base_t)});
+    message_t *msg = (message_t *) malloc(sizeof(message_t));
+    msg->buf = response;
+    msg->size = sizeof(cuda_mango::command_base_t);
+    message_queues[fd_idx].push(msg);
 }
 
-void send_on_socket(int fd_idx) {
+bool send_on_socket(int fd_idx) {
     printf("Sending data to %d\n", fd_idx);
-    int fd = pollfds[fd_idx].fd;
+    auto &curr_msg = messages_in_progress[fd_idx];
     auto &queue = message_queues[fd_idx];
-    for(auto &msg : queue) {
-        if (send(fd, msg.buf, msg.size, MSG_NOSIGNAL) < 0) {
-            if (errno == EPIPE) {
-                printf("Socket disconnected\n"); // What do we do here?
-                exit(EXIT_FAILURE);
-            } else {
-                perror("send");
-                exit(EXIT_FAILURE);
-            }
-        } else {
-            free(msg.buf);
-            printf("Ack sent\n");
+    int fd = pollfds[fd_idx].fd;
+
+    do {
+        if (curr_msg.msg == NULL && !queue.empty()) {
+            curr_msg.msg = queue.front();
+            queue.pop();
         }
-    }
-    queue.clear();
+        if (curr_msg.msg != NULL) {
+            size_t bytes_to_send = curr_msg.msg->size - curr_msg.byte_offset;
+            ssize_t bytes_sent = send(fd, (char *) curr_msg.msg->buf + curr_msg.byte_offset, bytes_to_send, MSG_NOSIGNAL | MSG_DONTWAIT);
+            printf("Bytes sent: %li\n", bytes_sent);
+            if(bytes_sent == 0 || (bytes_sent < 0 && (errno == EAGAIN || errno == EWOULDBLOCK))) {
+                printf("Can't send data right now, trying later\n");
+                break;
+            }
+            else if(bytes_sent < 0) {
+                perror("send");
+                return false;
+            } else {
+                curr_msg.byte_offset += bytes_sent;
+                if (curr_msg.byte_offset == curr_msg.msg->size) {
+                    free(curr_msg.msg->buf);
+                    free(curr_msg.msg);
+                    curr_msg.msg = NULL;
+                    curr_msg.byte_offset = 0;
+                }
+            }
+        } 
+    } while (curr_msg.msg != NULL || !queue.empty());
+    return true;
 }
 
 void check_for_writes() {
@@ -206,7 +230,9 @@ int main(int argc, char const *argv[])
                     }
                 }
                 if(socket_events & POLLOUT) { // Ready to write
-                    send_on_socket(i);
+                    if (!send_on_socket(i)) {
+                        close_socket(i);
+                    }
                 }
                 if(socket_events & POLLPRI) { // Exceptional condition (very rare)
                     printf("Exceptional condition on idx %d\n", i);
