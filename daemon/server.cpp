@@ -1,5 +1,4 @@
 
-// Server side C/C++ program to demonstrate Socket programming 
 #include <unistd.h> 
 #include <stdio.h> 
 #include <sys/socket.h> 
@@ -10,6 +9,7 @@
 #include <string.h> 
 #include <errno.h>
 #include <iostream>
+#include <vector>
 
 #include "commands.h"
 
@@ -23,7 +23,13 @@
 
 static bool running = true;
 
+typedef struct {
+    void* buf;
+    size_t size;
+} message_t;
+
 static pollfd pollfds[POLLFDS_SIZE]; 
+static std::vector<message_t> message_queues[POLLFDS_SIZE]; // listen socket does not need to write, so we can use MAX_CONNECTIONS here, the difference could be confusing
 
 void handle_hello_command(const cuda_mango::hello_command_t *cmd) {
     printf("%s\n", cmd->message);
@@ -62,10 +68,17 @@ void initialize_pollfds() {
     }
 }
 
+void close_socket(int fd_idx) {
+    close(pollfds[fd_idx].fd);
+    pollfds[fd_idx].fd = NO_SOCKET;
+    pollfds[fd_idx].events = 0;
+    pollfds[fd_idx].revents = 0;
+}
+
 void close_sockets() {
     for(int i = 0; i < POLLFDS_SIZE; i++) {
         if(pollfds[i].fd != NO_SOCKET) {
-            close(pollfds[i].fd);
+            close_socket(i);
         }
     }
 }
@@ -80,37 +93,61 @@ void accept_new_connection() {
     for(int i = 1; i < POLLFDS_SIZE; i++) {
         if(pollfds[i].fd == NO_SOCKET) {
             pollfds[i].fd = new_socket;
-            pollfds[i].events = POLLIN | POLLPRI | POLLOUT;
+            pollfds[i].events = POLLIN | POLLPRI;
             pollfds[i].revents = 0;
             break;
         }
     }
 }
 
-void receive_on_socket(int fd) {
+void receive_on_socket(int fd_idx) {
+    int fd = pollfds[fd_idx].fd;
     char buffer[BUFFER_SIZE];
     ssize_t bytes_read = recv(fd, &buffer, BUFFER_SIZE, 0);
+
     if (bytes_read < 0) {
         perror("read");
         exit(EXIT_FAILURE);
     }
+    else if(bytes_read == 0) return;
+
     printf("Bytes read:%li\n", bytes_read);
 
     handle_commands(buffer, bytes_read);
 
-    // SHOULD NOT ACTUALLY DO THIS HERE
-    // We need to buffer responses until we can write on the socket (POLLOUT)
-    cuda_mango::command_base_t response = cuda_mango::create_ack_command();
-    if (send(fd, &response, sizeof(response), MSG_NOSIGNAL) < 0) {
-        if (errno == EPIPE) {
-            printf("Socket disconnected\n"); // What do we do here?
-            exit(EXIT_FAILURE);
+    cuda_mango::command_base_t *response = (cuda_mango::command_base_t *) malloc(sizeof(cuda_mango::command_base_t));
+    response->cmd = cuda_mango::ACK;
+    message_queues[fd_idx].push_back({response, sizeof(cuda_mango::command_base_t)});
+}
+
+void send_on_socket(int fd_idx) {
+    printf("Sending data to %d\n", fd_idx);
+    int fd = pollfds[fd_idx].fd;
+    auto &queue = message_queues[fd_idx];
+    for(auto &msg : queue) {
+        if (send(fd, msg.buf, msg.size, MSG_NOSIGNAL) < 0) {
+            if (errno == EPIPE) {
+                printf("Socket disconnected\n"); // What do we do here?
+                exit(EXIT_FAILURE);
+            } else {
+                perror("send");
+                exit(EXIT_FAILURE);
+            }
         } else {
-            perror("send");
-            exit(EXIT_FAILURE);
+            free(msg.buf);
+            printf("Ack sent\n");
         }
-    } else {
-        printf("Ack sent\n");
+    }
+    queue.clear();
+}
+
+void check_for_writes() {
+    for(int i = 0; i < POLLFDS_SIZE; i++) {
+        if(message_queues[i].size() > 0) {
+            pollfds[i].events |= POLLOUT;
+        } else {
+            pollfds[i].events &= ~POLLOUT;
+        }
     }
 }
 
@@ -150,7 +187,8 @@ int main(int argc, char const *argv[])
 
     char continue_buf[8];
     while(running) {
-        int events = poll(pollfds, POLLFDS_SIZE, -1);
+        check_for_writes();
+        int events = poll(pollfds, POLLFDS_SIZE, -1 /* -1 == block until events are received */); 
 
         if (events == -1) {
             perror("poll");
@@ -164,11 +202,11 @@ int main(int argc, char const *argv[])
                     if(i == 0) { // Listen socket, new connection available
                         accept_new_connection();
                     } else {
-                        receive_on_socket(pollfds[i].fd);
+                        receive_on_socket(i);
                     }
                 }
                 if(socket_events & POLLOUT) { // Ready to write
-                    // Should send buffered messages for each socket here
+                    send_on_socket(i);
                 }
                 if(socket_events & POLLPRI) { // Exceptional condition (very rare)
                     printf("Exceptional condition on idx %d\n", i);
@@ -178,6 +216,7 @@ int main(int argc, char const *argv[])
                 }
                 if(socket_events & POLLHUP) { // Other end closed connection, some data may be left to read
                     printf("Got hang up on %d\n", i);
+                    close_socket(i);
                 }
                 if(socket_events & POLLNVAL) { // Invalid request, fd not open
                     printf("Socket %d at index %d is closed\n", pollfds[i].fd, i);
