@@ -1,5 +1,6 @@
 
 #include <unistd.h> 
+#include <fcntl.h>
 #include <stdio.h> 
 #include <sys/socket.h> 
 #include <sys/types.h>
@@ -33,9 +34,15 @@ typedef struct {
     size_t byte_offset;
 } sending_message_t;
 
+typedef struct {
+    char buf[BUFFER_SIZE];
+    size_t size;
+} receiving_message_t;
+
 static pollfd                   pollfds[POLLFDS_SIZE]; 
 static std::queue<message_t *>  message_queues[POLLFDS_SIZE]; // listen socket does not need to write, so we can use MAX_CONNECTIONS here, the difference could be confusing
-static sending_message_t        messages_in_progress[POLLFDS_SIZE];
+static sending_message_t        sending_messages[POLLFDS_SIZE];
+static receiving_message_t      receiving_messages[POLLFDS_SIZE];
 
 void handle_hello_command(const cuda_mango::hello_command_t *cmd) {
     printf("%s\n", cmd->message);
@@ -46,23 +53,34 @@ void handle_end_command(const cuda_mango::command_base_t *cmd) {
     running = false;
 }
 
-void handle_commands(const char *buffer, ssize_t size) {
-    size_t offset = 0;
-    while(offset < size) {
-        cuda_mango::command_base_t *base = (cuda_mango::command_base_t *)(buffer + offset);
-        switch (base->cmd) {
-            case cuda_mango::HELLO:
-                handle_hello_command((cuda_mango::hello_command_t *)(buffer + offset));
-                offset += sizeof(cuda_mango::hello_command_t);
-                break;
-            case cuda_mango::END:
-                handle_end_command((cuda_mango::command_base_t *)(buffer + offset));
-                offset += sizeof(cuda_mango::command_base_t);
-                break;
-            default:
-                printf("Unknown command\n");
-                break;
-        }
+#define INSUFFICIENT_DATA -1
+#define COMMAND_OK 1
+#define UNKNOWN_COMMAND 0
+
+int handle_commands(const char *buffer, size_t size) {
+    if (size < sizeof(cuda_mango::command_base_t)) {
+        return INSUFFICIENT_DATA; // Need to read more data to determine a command
+    }
+    cuda_mango::command_base_t *base = (cuda_mango::command_base_t *) buffer;
+    switch (base->cmd) {
+        case cuda_mango::HELLO:
+            if (size == sizeof(cuda_mango::hello_command_t)) {
+                handle_hello_command((cuda_mango::hello_command_t *) buffer);
+                return COMMAND_OK;
+            }
+            return INSUFFICIENT_DATA;
+            break;
+        case cuda_mango::END:
+            if (size == sizeof(cuda_mango::command_base_t)) {
+                handle_end_command((cuda_mango::command_base_t *) buffer);
+                return COMMAND_OK;
+            }
+            return INSUFFICIENT_DATA;
+            break;
+        default:
+            printf("Unknown command\n");
+            return UNKNOWN_COMMAND;
+            break;
     }
 }
 
@@ -74,11 +92,29 @@ void initialize_pollfds() {
     }
 }
 
-void close_socket(int fd_idx) {
-    close(pollfds[fd_idx].fd);
+void reset_socket_structs(int fd_idx) {
     pollfds[fd_idx].fd = NO_SOCKET;
     pollfds[fd_idx].events = 0;
     pollfds[fd_idx].revents = 0;
+
+    // No other way to empty the queue unless we want to dequeue over and over
+    std::queue<message_t *> empty;
+    message_queues[fd_idx].swap(empty);
+    
+    if (sending_messages[fd_idx].msg != NULL) {
+        free(sending_messages[fd_idx].msg->buf);
+        free(sending_messages[fd_idx].msg);
+        sending_messages[fd_idx].msg = NULL;
+    }
+    sending_messages[fd_idx].byte_offset = 0;
+
+    receiving_messages[fd_idx].size = 0;
+}
+
+void close_socket(int fd_idx) {
+    printf("Closing socket %d\n", fd_idx);
+    close(pollfds[fd_idx].fd);
+    reset_socket_structs(fd_idx);
 }
 
 void close_sockets() {
@@ -89,49 +125,72 @@ void close_sockets() {
     }
 }
 
-void accept_new_connection() {
+bool accept_new_connection() {
     int server_fd = pollfds[0].fd;
     int new_socket = accept(server_fd, NULL, NULL);
     if (new_socket < 0) {
-        perror("accept");
-        exit(EXIT_FAILURE);
+        if(errno == EAGAIN || errno == EWOULDBLOCK) {
+            printf("accept: No connection available, trying again later\n");
+            return true;
+        } else {
+            perror("accept");
+            return false;
+        }
     }
     for(int i = 1; i < POLLFDS_SIZE; i++) {
         if(pollfds[i].fd == NO_SOCKET) {
             pollfds[i].fd = new_socket;
             pollfds[i].events = POLLIN | POLLPRI;
             pollfds[i].revents = 0;
+            printf("New connection on %d\n", i);
             break;
         }
     }
+    return true;
 }
 
-void receive_on_socket(int fd_idx) {
+bool receive_on_socket(int fd_idx) {
     int fd = pollfds[fd_idx].fd;
-    char buffer[BUFFER_SIZE];
-    ssize_t bytes_read = recv(fd, &buffer, BUFFER_SIZE, 0);
 
-    if (bytes_read < 0) {
-        perror("read");
-        exit(EXIT_FAILURE);
+    while(true) {
+        ssize_t bytes_read = recv(fd, receiving_messages[fd_idx].buf + receiving_messages[fd_idx].size, BUFFER_SIZE, MSG_NOSIGNAL | MSG_DONTWAIT);
+        if (bytes_read < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+            return true;
+        }
+        else if (bytes_read < 0) {
+            perror("read");
+            return false;
+        }
+        else if(bytes_read == 0) {
+            printf("0 bytes received, got hang up on\n");
+            return false;
+        }
+
+        printf("Bytes received: %li\n", bytes_read);
+        receiving_messages[fd_idx].size += bytes_read;
+
+        int res = handle_commands(receiving_messages[fd_idx].buf, receiving_messages[fd_idx].size);
+        if (res == UNKNOWN_COMMAND) return false;
+        else if (res == INSUFFICIENT_DATA && receiving_messages[fd_idx].size == BUFFER_SIZE) {
+            printf("Buffer filled but a command couldn't be parsed\n");
+            return false;
+        }
+        else if (res == COMMAND_OK) {
+            receiving_messages[fd_idx].size = 0;
+
+            cuda_mango::command_base_t *response = (cuda_mango::command_base_t *) malloc(sizeof(cuda_mango::command_base_t));
+            response->cmd = cuda_mango::ACK;
+            message_t *msg = (message_t *) malloc(sizeof(message_t));
+            msg->buf = response;
+            msg->size = sizeof(cuda_mango::command_base_t);
+            message_queues[fd_idx].push(msg);
+        } 
     }
-    else if(bytes_read == 0) return;
-
-    printf("Bytes received: %li\n", bytes_read);
-
-    handle_commands(buffer, bytes_read);
-
-    cuda_mango::command_base_t *response = (cuda_mango::command_base_t *) malloc(sizeof(cuda_mango::command_base_t));
-    response->cmd = cuda_mango::ACK;
-    message_t *msg = (message_t *) malloc(sizeof(message_t));
-    msg->buf = response;
-    msg->size = sizeof(cuda_mango::command_base_t);
-    message_queues[fd_idx].push(msg);
 }
 
 bool send_on_socket(int fd_idx) {
     printf("Sending data to %d\n", fd_idx);
-    auto &curr_msg = messages_in_progress[fd_idx];
+    auto &curr_msg = sending_messages[fd_idx];
     auto &queue = message_queues[fd_idx];
     int fd = pollfds[fd_idx].fd;
 
@@ -167,7 +226,7 @@ bool send_on_socket(int fd_idx) {
 
 void check_for_writes() {
     for(int i = 0; i < POLLFDS_SIZE; i++) {
-        if(message_queues[i].size() > 0) {
+        if(!message_queues[i].empty()) {
             pollfds[i].events |= POLLOUT;
         } else {
             pollfds[i].events &= ~POLLOUT;
@@ -189,6 +248,9 @@ int main(int argc, char const *argv[])
         perror("socket failed"); 
         exit(EXIT_FAILURE); 
     } 
+
+    int flags = fcntl(server_fd, F_GETFL);
+    fcntl(server_fd, F_SETFL, flags | O_NONBLOCK);
 
     address.sun_family = AF_UNIX; 
     strcpy(address.sun_path, SOCKET_PATH);
@@ -224,34 +286,57 @@ int main(int argc, char const *argv[])
                 auto socket_events = pollfds[i].revents;
                 if(socket_events & POLLIN) { // Ready to read
                     if(i == 0) { // Listen socket, new connection available
-                        accept_new_connection();
+                        if(!accept_new_connection()) {
+                            printf("(loop %d) Accept error, closing socket\n", loop);
+                            close_sockets();
+                            exit(EXIT_FAILURE);
+                        }
                     } else {
-                        receive_on_socket(i);
+                        if (!receive_on_socket(i)) {
+                            printf("(loop %d) Receive error, closing socket\n", loop);
+                            close_socket(i);
+                            events_left--;
+                            continue;
+                        }
                     }
                 }
                 if(socket_events & POLLOUT) { // Ready to write
                     if (!send_on_socket(i)) {
+                        printf("(loop %d) Send error, closing socket\n", loop);
                         close_socket(i);
+                        events_left--;
+                        continue;
                     }
                 }
                 if(socket_events & POLLPRI) { // Exceptional condition (very rare)
-                    printf("Exceptional condition on idx %d\n", i);
+                    printf("(loop %d) Exceptional condition on idx %d\n", loop, i);
+                    close_socket(i);
+                    events_left--;
+                    continue;
                 }
                 if(socket_events & POLLERR) { // Error / read end of pipe is closed
-                    printf("Error on idx %d\n", i); // errno?
+                    printf("(loop %d) Error on idx %d\n", loop, i); // errno?
+                    close_socket(i);
+                    events_left--;
+                    continue;
                 }
                 if(socket_events & POLLHUP) { // Other end closed connection, some data may be left to read
-                    printf("Got hang up on %d\n", i);
+                    printf("(loop %d) Got hang up on %d\n", loop, i);
                     close_socket(i);
+                    events_left--;
+                    continue;
                 }
                 if(socket_events & POLLNVAL) { // Invalid request, fd not open
-                    printf("Socket %d at index %d is closed\n", pollfds[i].fd, i);
-                    exit(EXIT_FAILURE);
+                    printf("(loop %d) Socket %d at index %d is closed\n", loop, pollfds[i].fd, i);
+                    reset_socket_structs(i);
+                    events_left--;
+                    continue;
                 }
                 pollfds[i].revents = 0;
                 events_left--;
             }
         }
+        loop++;
     }     
 
     printf("Finishing up\n");
