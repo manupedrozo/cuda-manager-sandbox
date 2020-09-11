@@ -153,7 +153,7 @@ bool receive_on_socket(int fd_idx) {
     int fd = pollfds[fd_idx].fd;
 
     while(true) {
-        ssize_t bytes_read = recv(fd, receiving_messages[fd_idx].buf + receiving_messages[fd_idx].size, BUFFER_SIZE, MSG_NOSIGNAL | MSG_DONTWAIT);
+        ssize_t bytes_read = recv(fd, receiving_messages[fd_idx].buf + receiving_messages[fd_idx].size, BUFFER_SIZE - receiving_messages[fd_idx].size, MSG_NOSIGNAL | MSG_DONTWAIT);
         if (bytes_read < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
             return true;
         }
@@ -202,7 +202,6 @@ bool send_on_socket(int fd_idx) {
         if (curr_msg.msg != NULL) {
             size_t bytes_to_send = curr_msg.msg->size - curr_msg.byte_offset;
             ssize_t bytes_sent = send(fd, (char *) curr_msg.msg->buf + curr_msg.byte_offset, bytes_to_send, MSG_NOSIGNAL | MSG_DONTWAIT);
-            printf("Bytes sent: %li\n", bytes_sent);
             if(bytes_sent == 0 || (bytes_sent < 0 && (errno == EAGAIN || errno == EWOULDBLOCK))) {
                 printf("Can't send data right now, trying later\n");
                 break;
@@ -211,6 +210,7 @@ bool send_on_socket(int fd_idx) {
                 perror("send");
                 return false;
             } else {
+                printf("Bytes sent: %li\n", bytes_sent);
                 curr_msg.byte_offset += bytes_sent;
                 if (curr_msg.byte_offset == curr_msg.msg->size) {
                     free(curr_msg.msg->buf);

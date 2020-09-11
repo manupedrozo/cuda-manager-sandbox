@@ -1,3 +1,5 @@
+#include <string.h>
+
 namespace cuda_mango {
     enum command_type {
         HELLO,
