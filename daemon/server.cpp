@@ -234,17 +234,14 @@ void check_for_writes() {
     }
 }
 
-int main(int argc, char const *argv[]) 
-{ 
+void initialize_server() {
     initialize_pollfds();
     
     int &server_fd = pollfds[0].fd;
     pollfds[0].events = POLLIN | POLLPRI;
     struct sockaddr_un address; 
        
-    // Creating socket file descriptor 
-    if ((server_fd = socket(AF_UNIX, SOCK_STREAM, 0)) == 0) 
-    { 
+    if ((server_fd = socket(AF_UNIX, SOCK_STREAM, 0)) == 0) { 
         perror("socket failed"); 
         exit(EXIT_FAILURE); 
     } 
@@ -257,21 +254,20 @@ int main(int argc, char const *argv[])
 
     unlink(address.sun_path);
        
-    if (bind(server_fd, (struct sockaddr *)&address, sizeof(address))<0) 
-    { 
+    if (bind(server_fd, (struct sockaddr *) &address, sizeof(address)) < 0) { 
         perror("bind failed"); 
         exit(EXIT_FAILURE); 
     } 
 
-    if (listen(server_fd, 3) < 0) 
-    { 
+    if (listen(server_fd, 3) < 0)  { 
         perror("listen"); 
         exit(EXIT_FAILURE); 
     } 
+}
 
+void server_loop() {
     int loop = 0;
 
-    char continue_buf[8];
     while(running) {
         check_for_writes();
         int events = poll(pollfds, POLLFDS_SIZE, -1 /* -1 == block until events are received */); 
@@ -338,9 +334,20 @@ int main(int argc, char const *argv[])
         }
         loop++;
     }     
+}
 
+void end_server() {
     printf("Finishing up\n");
     close_sockets();
+}   
 
+int main(int argc, char const *argv[]) 
+{ 
+    initialize_server();
+
+    server_loop();
+
+    end_server();
+    
     return 0; 
 } 
