@@ -36,13 +36,20 @@ typedef struct {
 
 typedef struct {
     char buf[BUFFER_SIZE];
-    size_t size;
+    size_t byte_offset;
 } receiving_message_t;
+
+typedef struct {
+    bool waiting;
+    message_t *msg;
+    size_t byte_offset;
+} receiving_data_t;
 
 static pollfd                   pollfds[POLLFDS_SIZE]; 
 static std::queue<message_t *>  message_queues[POLLFDS_SIZE]; // listen socket does not need to write, so we can use MAX_CONNECTIONS here, the difference could be confusing
 static sending_message_t        sending_messages[POLLFDS_SIZE];
 static receiving_message_t      receiving_messages[POLLFDS_SIZE];
+static receiving_data_t         receiving_data[POLLFDS_SIZE];
 
 void handle_hello_command(const cuda_mango::hello_command_t *cmd) {
     printf("%s\n", cmd->message);
@@ -53,11 +60,18 @@ void handle_end_command(const cuda_mango::command_base_t *cmd) {
     running = false;
 }
 
+void handle_variable_length_command(int fd_idx, const cuda_mango::variable_length_command_t *cmd) {
+    receiving_data[fd_idx].waiting = true;
+    receiving_data[fd_idx].msg = (message_t*) malloc(sizeof(message_t));
+    receiving_data[fd_idx].msg->buf = malloc(cmd->size);
+    receiving_data[fd_idx].msg->size = cmd->size;
+}
+
 #define INSUFFICIENT_DATA -1
 #define COMMAND_OK 1
 #define UNKNOWN_COMMAND 0
 
-int handle_commands(const char *buffer, size_t size) {
+int handle_commands(int fd_idx, const char *buffer, size_t size) {
     if (size < sizeof(cuda_mango::command_base_t)) {
         return INSUFFICIENT_DATA; // Need to read more data to determine a command
     }
@@ -77,11 +91,31 @@ int handle_commands(const char *buffer, size_t size) {
             }
             return INSUFFICIENT_DATA;
             break;
+        case cuda_mango::VARIABLE:
+            if (size == sizeof(cuda_mango::variable_length_command_t)) {
+                handle_variable_length_command(fd_idx, (cuda_mango::variable_length_command_t *) buffer);
+                return COMMAND_OK;
+            }
+            return INSUFFICIENT_DATA;
+            break;
         default:
             printf("Unknown command\n");
             return UNKNOWN_COMMAND;
             break;
     }
+}
+
+void handle_data_transfer_end(int fd_idx) {
+    receiving_data[fd_idx].waiting = false;
+    receiving_data[fd_idx].byte_offset = 0;
+
+    // Use data in some way, whatever we call here is responsible for freeing the buffer.
+        printf("Variable length data: \n%s\n", (char*) receiving_data[fd_idx].msg->buf);
+        free(receiving_data[fd_idx].msg->buf);
+    //
+
+    free(receiving_data[fd_idx].msg);
+    receiving_data[fd_idx].msg = NULL;
 }
 
 void initialize_pollfds() {
@@ -101,14 +135,22 @@ void reset_socket_structs(int fd_idx) {
     std::queue<message_t *> empty;
     message_queues[fd_idx].swap(empty);
     
+    sending_messages[fd_idx].byte_offset = 0;
     if (sending_messages[fd_idx].msg != NULL) {
         free(sending_messages[fd_idx].msg->buf);
         free(sending_messages[fd_idx].msg);
         sending_messages[fd_idx].msg = NULL;
     }
-    sending_messages[fd_idx].byte_offset = 0;
+    
+    receiving_messages[fd_idx].byte_offset = 0;
 
-    receiving_messages[fd_idx].size = 0;
+    receiving_data[fd_idx].waiting = false;
+    receiving_data[fd_idx].byte_offset = 0;
+    if (receiving_data[fd_idx].msg != NULL) {
+        free(receiving_data[fd_idx].msg->buf);
+        free(receiving_data[fd_idx].msg);
+        receiving_data[fd_idx].msg = NULL;
+    }
 }
 
 void close_socket(int fd_idx) {
@@ -153,7 +195,19 @@ bool receive_on_socket(int fd_idx) {
     int fd = pollfds[fd_idx].fd;
 
     while(true) {
-        ssize_t bytes_read = recv(fd, receiving_messages[fd_idx].buf + receiving_messages[fd_idx].size, BUFFER_SIZE - receiving_messages[fd_idx].size, MSG_NOSIGNAL | MSG_DONTWAIT);
+        const bool waiting_for_data = receiving_data[fd_idx].waiting;
+        void *buf;
+        size_t size_max;
+
+        if (waiting_for_data) {
+            buf = (char*) receiving_data[fd_idx].msg->buf + receiving_data[fd_idx].byte_offset;
+            size_max = receiving_data[fd_idx].msg->size - receiving_data[fd_idx].byte_offset;
+        } else {
+            buf = receiving_messages[fd_idx].buf + receiving_messages[fd_idx].byte_offset;
+            size_max = BUFFER_SIZE - receiving_messages[fd_idx].byte_offset;
+        }
+
+        ssize_t bytes_read = recv(fd, buf, size_max, MSG_NOSIGNAL | MSG_DONTWAIT);
         if (bytes_read < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
             return true;
         }
@@ -167,24 +221,41 @@ bool receive_on_socket(int fd_idx) {
         }
 
         printf("Bytes received: %li\n", bytes_read);
-        receiving_messages[fd_idx].size += bytes_read;
 
-        int res = handle_commands(receiving_messages[fd_idx].buf, receiving_messages[fd_idx].size);
-        if (res == UNKNOWN_COMMAND) return false;
-        else if (res == INSUFFICIENT_DATA && receiving_messages[fd_idx].size == BUFFER_SIZE) {
-            printf("Buffer filled but a command couldn't be parsed\n");
-            return false;
+        if (waiting_for_data) {
+            receiving_data[fd_idx].byte_offset += bytes_read;
+            size_t offset = receiving_data[fd_idx].byte_offset;
+            size_t expected_size = receiving_data[fd_idx].msg->size;
+            if (offset == expected_size) {
+                handle_data_transfer_end(fd_idx);
+
+                cuda_mango::command_base_t *response = (cuda_mango::command_base_t *) malloc(sizeof(cuda_mango::command_base_t));
+                cuda_mango::init_ack_command(*response);
+                message_t *msg = (message_t *) malloc(sizeof(message_t));
+                msg->buf = response;
+                msg->size = sizeof(cuda_mango::command_base_t);
+                message_queues[fd_idx].push(msg);
+            }
+        } else {
+            receiving_messages[fd_idx].byte_offset += bytes_read;
+
+            int res = handle_commands(fd_idx, receiving_messages[fd_idx].buf, receiving_messages[fd_idx].byte_offset);
+            if (res == UNKNOWN_COMMAND) return false;
+            else if (res == INSUFFICIENT_DATA && receiving_messages[fd_idx].byte_offset == BUFFER_SIZE) {
+                printf("Buffer filled but a command couldn't be parsed\n");
+                return false;
+            }
+            else if (res == COMMAND_OK) {
+                receiving_messages[fd_idx].byte_offset = 0;
+
+                cuda_mango::command_base_t *response = (cuda_mango::command_base_t *) malloc(sizeof(cuda_mango::command_base_t));
+                cuda_mango::init_ack_command(*response);
+                message_t *msg = (message_t *) malloc(sizeof(message_t));
+                msg->buf = response;
+                msg->size = sizeof(cuda_mango::command_base_t);
+                message_queues[fd_idx].push(msg);
+            } 
         }
-        else if (res == COMMAND_OK) {
-            receiving_messages[fd_idx].size = 0;
-
-            cuda_mango::command_base_t *response = (cuda_mango::command_base_t *) malloc(sizeof(cuda_mango::command_base_t));
-            response->cmd = cuda_mango::ACK;
-            message_t *msg = (message_t *) malloc(sizeof(message_t));
-            msg->buf = response;
-            msg->size = sizeof(cuda_mango::command_base_t);
-            message_queues[fd_idx].push(msg);
-        } 
     }
 }
 

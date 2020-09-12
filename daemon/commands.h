@@ -3,34 +3,43 @@
 namespace cuda_mango {
     enum command_type {
         HELLO,
+        VARIABLE,
         END,
         ACK,
     };
 
     // All commands must be of fixed size (no pointers). 
-    // If variable length buffers are needed we need to look into shared memory.
 
-    typedef struct command_base {
+    typedef struct {
         command_type cmd;
     } command_base_t;
 
-    typedef struct hello_command {
+    typedef struct {
         command_type cmd;
         char message[128];
     } hello_command_t;
 
-    inline command_base_t create_end_command() {
-        return {END};
+    // For sending variable length data, specify the size to read and the server will accumulate whatever is sent next upto the size specified
+    typedef struct {
+        command_type cmd;
+        size_t size;
+    } variable_length_command_t;
+
+    inline void init_end_command(command_base_t &cmd) {
+        cmd.cmd = END;
     }
 
-    inline hello_command_t create_hello_command(const char* message) {
-        hello_command_t cmd;
+    inline void init_hello_command(hello_command_t &cmd, const char* message) {
         cmd.cmd = HELLO;
         strcpy(cmd.message, message);
-        return cmd;
     }
 
-    inline command_base_t create_ack_command() {
-        return {ACK};
+    inline void init_ack_command(command_base_t &cmd) {
+        cmd.cmd = ACK;
+    }
+
+    inline void init_variable_length_command(variable_length_command_t &cmd, size_t size) {
+        cmd.cmd = VARIABLE;
+        cmd.size = size;
     }
 };

@@ -30,7 +30,8 @@ int main(int argc, char const *argv[])
         return -1; 
     } 
 
-    cuda_mango::command_base_t cmd = cuda_mango::create_end_command();
+    cuda_mango::command_base_t cmd;
+    cuda_mango::init_end_command(cmd);
 
     send(sock, &cmd, sizeof(cmd), 0); 
     printf("Killing server\n"); 

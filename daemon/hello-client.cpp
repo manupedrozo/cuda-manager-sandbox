@@ -1,5 +1,4 @@
 
-// Client side C/C++ program to demonstrate Socket programming 
 #include <stdio.h> 
 
 #include "commands.h"
@@ -14,7 +13,8 @@ int main(int argc, char const *argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    cuda_mango::hello_command_t hello_cmd = cuda_mango::create_hello_command("Hello from client");
+    cuda_mango::hello_command_t hello_cmd;
+    cuda_mango::init_hello_command(hello_cmd, "Hello from client");
 
     cuda_mango::command_base_t res;
 

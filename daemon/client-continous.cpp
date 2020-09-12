@@ -22,7 +22,8 @@ int main(int argc, char const *argv[]) {
         std::cin >> msg_buf;
 
         printf("Message: %s\n", msg_buf);
-        cuda_mango::hello_command_t hello_cmd = cuda_mango::create_hello_command(msg_buf);
+        cuda_mango::hello_command_t hello_cmd;
+        cuda_mango::init_hello_command(hello_cmd, msg_buf);
 
         cuda_mango::command_base_t res;
 
