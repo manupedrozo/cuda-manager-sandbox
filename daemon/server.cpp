@@ -1,4 +1,3 @@
-
 #include <unistd.h> 
 #include <fcntl.h>
 #include <stdio.h> 
@@ -21,6 +20,11 @@
 
 #define MAX_CONNECTIONS 10 // Max client connections
 #define POLLFDS_SIZE MAX_CONNECTIONS + 1 // Clients + listen socket
+#define LISTEN_IDX MAX_CONNECTIONS
+
+#define INSUFFICIENT_DATA -1
+#define COMMAND_OK 1
+#define UNKNOWN_COMMAND 0
 
 static bool running = true;
 
@@ -46,10 +50,10 @@ typedef struct {
 } receiving_data_t;
 
 static pollfd                   pollfds[POLLFDS_SIZE]; 
-static std::queue<message_t *>  message_queues[POLLFDS_SIZE]; // listen socket does not need to write, so we can use MAX_CONNECTIONS here, the difference could be confusing
-static sending_message_t        sending_messages[POLLFDS_SIZE];
-static receiving_message_t      receiving_messages[POLLFDS_SIZE];
-static receiving_data_t         receiving_data[POLLFDS_SIZE];
+static std::queue<message_t *>  message_queues[MAX_CONNECTIONS];
+static sending_message_t        sending_messages[MAX_CONNECTIONS];
+static receiving_message_t      receiving_messages[MAX_CONNECTIONS];
+static receiving_data_t         receiving_data[MAX_CONNECTIONS];
 
 void handle_hello_command(const cuda_mango::hello_command_t *cmd) {
     printf("%s\n", cmd->message);
@@ -66,10 +70,6 @@ void handle_variable_length_command(int fd_idx, const cuda_mango::variable_lengt
     receiving_data[fd_idx].msg->buf = malloc(cmd->size);
     receiving_data[fd_idx].msg->size = cmd->size;
 }
-
-#define INSUFFICIENT_DATA -1
-#define COMMAND_OK 1
-#define UNKNOWN_COMMAND 0
 
 int handle_commands(int fd_idx, const char *buffer, size_t size) {
     if (size < sizeof(cuda_mango::command_base_t)) {
@@ -99,7 +99,7 @@ int handle_commands(int fd_idx, const char *buffer, size_t size) {
             return INSUFFICIENT_DATA;
             break;
         default:
-            printf("Unknown command\n");
+            printf("handle: Unknown command\n");
             return UNKNOWN_COMMAND;
             break;
     }
@@ -154,9 +154,11 @@ void reset_socket_structs(int fd_idx) {
 }
 
 void close_socket(int fd_idx) {
-    printf("Closing socket %d\n", fd_idx);
+    printf("close: Closing socket %d\n", fd_idx);
     close(pollfds[fd_idx].fd);
-    reset_socket_structs(fd_idx);
+    if (fd_idx != LISTEN_IDX) {
+        reset_socket_structs(fd_idx);
+    }
 }
 
 void close_sockets() {
@@ -168,7 +170,7 @@ void close_sockets() {
 }
 
 bool accept_new_connection() {
-    int server_fd = pollfds[0].fd;
+    int server_fd = pollfds[LISTEN_IDX].fd;
     int new_socket = accept(server_fd, NULL, NULL);
     if (new_socket < 0) {
         if(errno == EAGAIN || errno == EWOULDBLOCK) {
@@ -179,19 +181,26 @@ bool accept_new_connection() {
             return false;
         }
     }
-    for(int i = 1; i < POLLFDS_SIZE; i++) {
+    int new_socket_idx = -1;
+    for(int i = 0; i < MAX_CONNECTIONS; i++) {
         if(pollfds[i].fd == NO_SOCKET) {
-            pollfds[i].fd = new_socket;
-            pollfds[i].events = POLLIN | POLLPRI;
-            pollfds[i].revents = 0;
-            printf("New connection on %d\n", i);
-            break;
+            new_socket_idx = i;
         }
     }
+    if (new_socket_idx == -1) {
+        printf("accept: Connection limit reached, rejecting connection\n");
+        close(new_socket);
+        return true;
+    }
+    pollfds[new_socket_idx].fd = new_socket;
+    pollfds[new_socket_idx].events = POLLIN | POLLPRI;
+    pollfds[new_socket_idx].revents = 0;
+    printf("accept: New connection on %d\n", new_socket_idx);
     return true;
 }
 
 bool receive_on_socket(int fd_idx) {
+    printf("receive: Receiving on socket %d\n", fd_idx);
     int fd = pollfds[fd_idx].fd;
 
     while(true) {
@@ -212,15 +221,15 @@ bool receive_on_socket(int fd_idx) {
             return true;
         }
         else if (bytes_read < 0) {
-            perror("read");
+            perror("receive (read)");
             return false;
         }
         else if(bytes_read == 0) {
-            printf("0 bytes received, got hang up on\n");
+            printf("receive: 0 bytes received, got hang up on\n");
             return false;
         }
 
-        printf("Bytes received: %li\n", bytes_read);
+        printf("receive: %li bytes received\n", bytes_read);
 
         if (waiting_for_data) {
             receiving_data[fd_idx].byte_offset += bytes_read;
@@ -242,7 +251,7 @@ bool receive_on_socket(int fd_idx) {
             int res = handle_commands(fd_idx, receiving_messages[fd_idx].buf, receiving_messages[fd_idx].byte_offset);
             if (res == UNKNOWN_COMMAND) return false;
             else if (res == INSUFFICIENT_DATA && receiving_messages[fd_idx].byte_offset == BUFFER_SIZE) {
-                printf("Buffer filled but a command couldn't be parsed\n");
+                printf("receive: Buffer filled but a command couldn't be parsed\n");
                 return false;
             }
             else if (res == COMMAND_OK) {
@@ -260,7 +269,7 @@ bool receive_on_socket(int fd_idx) {
 }
 
 bool send_on_socket(int fd_idx) {
-    printf("Sending data to %d\n", fd_idx);
+    printf("send: Sending data to %d\n", fd_idx);
     auto &curr_msg = sending_messages[fd_idx];
     auto &queue = message_queues[fd_idx];
     int fd = pollfds[fd_idx].fd;
@@ -274,14 +283,14 @@ bool send_on_socket(int fd_idx) {
             size_t bytes_to_send = curr_msg.msg->size - curr_msg.byte_offset;
             ssize_t bytes_sent = send(fd, (char *) curr_msg.msg->buf + curr_msg.byte_offset, bytes_to_send, MSG_NOSIGNAL | MSG_DONTWAIT);
             if(bytes_sent == 0 || (bytes_sent < 0 && (errno == EAGAIN || errno == EWOULDBLOCK))) {
-                printf("Can't send data right now, trying later\n");
+                printf("send: Can't send data right now, trying later\n");
                 break;
             }
             else if(bytes_sent < 0) {
                 perror("send");
                 return false;
             } else {
-                printf("Bytes sent: %li\n", bytes_sent);
+                printf("send: %li bytes sent\n", bytes_sent);
                 curr_msg.byte_offset += bytes_sent;
                 if (curr_msg.byte_offset == curr_msg.msg->size) {
                     free(curr_msg.msg->buf);
@@ -296,7 +305,7 @@ bool send_on_socket(int fd_idx) {
 }
 
 void check_for_writes() {
-    for(int i = 0; i < POLLFDS_SIZE; i++) {
+    for(int i = 0; i < MAX_CONNECTIONS; i++) {
         if(!message_queues[i].empty()) {
             pollfds[i].events |= POLLOUT;
         } else {
@@ -307,31 +316,31 @@ void check_for_writes() {
 
 void initialize_server() {
     initialize_pollfds();
-    
-    int &server_fd = pollfds[0].fd;
-    pollfds[0].events = POLLIN | POLLPRI;
-    struct sockaddr_un address; 
-       
+
+    int &server_fd = pollfds[LISTEN_IDX].fd;
+    pollfds[LISTEN_IDX].events = POLLIN | POLLPRI;
+
     if ((server_fd = socket(AF_UNIX, SOCK_STREAM, 0)) == 0) { 
-        perror("socket failed"); 
+        perror("init (socket)"); 
         exit(EXIT_FAILURE); 
     } 
 
     int flags = fcntl(server_fd, F_GETFL);
     fcntl(server_fd, F_SETFL, flags | O_NONBLOCK);
 
+    struct sockaddr_un address;
     address.sun_family = AF_UNIX; 
     strcpy(address.sun_path, SOCKET_PATH);
 
     unlink(address.sun_path);
        
     if (bind(server_fd, (struct sockaddr *) &address, sizeof(address)) < 0) { 
-        perror("bind failed"); 
+        perror("init (bind)"); 
         exit(EXIT_FAILURE); 
     } 
 
     if (listen(server_fd, 3) < 0)  { 
-        perror("listen"); 
+        perror("init (listen)"); 
         exit(EXIT_FAILURE); 
     } 
 }
@@ -344,7 +353,7 @@ void server_loop() {
         int events = poll(pollfds, POLLFDS_SIZE, -1 /* -1 == block until events are received */); 
 
         if (events == -1) {
-            perror("poll");
+            perror("loop (poll)");
             exit(EXIT_FAILURE);
         }
 
@@ -352,7 +361,7 @@ void server_loop() {
             if(pollfds[i].revents) {
                 auto socket_events = pollfds[i].revents;
                 if(socket_events & POLLIN) { // Ready to read
-                    if(i == 0) { // Listen socket, new connection available
+                    if(i == LISTEN_IDX) { // Listen socket, new connection available
                         if(!accept_new_connection()) {
                             printf("(loop %d) Accept error, closing socket\n", loop);
                             close_sockets();
@@ -408,7 +417,7 @@ void server_loop() {
 }
 
 void end_server() {
-    printf("Finishing up\n");
+    printf("end: Finishing up\n");
     close_sockets();
 }   
 
