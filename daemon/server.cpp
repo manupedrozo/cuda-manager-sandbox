@@ -48,13 +48,13 @@ typedef struct {
     size_t byte_offset;
 } receiving_data_t;
 
-static pollfd                   pollfds[POLLFDS_SIZE]; 
+static pollfd                   pollfds[POLLFDS_SIZE];                  // Sockets to poll. Listen socket + client connections.
 
-static std::queue<message_t *>  message_queues[MAX_CONNECTIONS];        //messages queued to send
-static sending_message_t        sending_messages[MAX_CONNECTIONS];      //message in process of being sent to the client
+static std::queue<message_t *>  message_queues[MAX_CONNECTIONS];        // Messages queued to send
+static sending_message_t        sending_messages[MAX_CONNECTIONS];      // Message in process of being sent to the client
 
-static receiving_message_t      receiving_messages[MAX_CONNECTIONS];    //message in process of being received from the client
-static receiving_data_t         receiving_data[MAX_CONNECTIONS];        //unstructured data being received
+static receiving_message_t      receiving_messages[MAX_CONNECTIONS];    // Message in process of being received from the client
+static receiving_data_t         receiving_data[MAX_CONNECTIONS];        // Unstructured data being received
 
 void handle_hello_command(const cuda_mango::hello_command_t *cmd) {
     printf("%s\n", cmd->message);
@@ -336,7 +336,7 @@ bool send_on_socket(int fd_idx) {
 
 void check_for_writes() {
     for(int i = 0; i < MAX_CONNECTIONS; i++) {
-        if(!message_queues[i].empty()) {
+        if(!message_queues[i].empty() || sending_messages[i].msg != NULL) {
             pollfds[i].events |= POLLOUT;
         } else {
             pollfds[i].events &= ~POLLOUT;
@@ -451,8 +451,7 @@ void end_server() {
     close_sockets();
 }   
 
-int main(int argc, char const *argv[]) 
-{ 
+int main(int argc, char const *argv[]) { 
     initialize_server();
 
     server_loop();
