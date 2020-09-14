@@ -1,10 +1,11 @@
 #include <stdlib.h>
 
 namespace cuda_mango {
+
     class CudaClient {
 
         enum ExitCode {
-            OK,
+            OK,             // successful operation
             ERROR,          // generic error in the request
             SEVERE_ERROR,   // error that leaves the client unusable
         };
@@ -27,5 +28,5 @@ namespace cuda_mango {
 
             void close_socket();
     };
-    
+
 }

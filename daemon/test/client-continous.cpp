@@ -1,10 +1,8 @@
-
-// Client side C/C++ program to demonstrate Socket programming 
 #include <stdio.h> 
 #include <iostream>
 
 #include "commands.h"
-#include "client.h"
+#include "socket_client.h"
 
 #define SOCKET_PATH "/tmp/server-test"
 

@@ -4,7 +4,7 @@
 #include <unistd.h>
 #include <string.h>
 
-#include "client.h"
+#include "socket_client.h"
 
 int initialize(const char *socket_path) {
     int sock; 
@@ -17,7 +17,7 @@ int initialize(const char *socket_path) {
     serv_addr.sun_family = AF_UNIX; 
     strcpy(serv_addr.sun_path, socket_path);
    
-    if (connect(sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) { 
+    if (connect(sock, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) { 
         printf("Connection Failed\n"); 
         return -1; 
     } 

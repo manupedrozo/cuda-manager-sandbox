@@ -1,4 +1,3 @@
-// Client side C/C++ program to demonstrate Socket programming 
 #include <stdio.h> 
 #include <sys/socket.h> 
 #include <sys/types.h>
@@ -10,11 +9,10 @@
 
 #define SOCKET_PATH "/tmp/server-test"
    
-int main(int argc, char const *argv[]) 
-{ 
+int main(int argc, char const *argv[]) { 
     int sock = 0, valread; 
     struct sockaddr_un serv_addr; 
-    char *hello = "Hello from client"; 
+
     if ((sock = socket(AF_UNIX, SOCK_STREAM, 0)) < 0) 
     { 
         printf("\n Socket creation error \n"); 

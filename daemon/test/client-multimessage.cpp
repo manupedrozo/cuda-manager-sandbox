@@ -3,7 +3,7 @@
 #include <sstream>
 
 #include "commands.h"
-#include "client.h"
+#include "socket_client.h"
 
 #define SOCKET_PATH "/tmp/server-test"
 
