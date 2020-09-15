@@ -1,3 +1,6 @@
+#ifndef CUDA_CLIENT_H
+#define CUDA_CLIENT_H
+
 #include <stdlib.h>
 
 namespace cuda_mango {
@@ -30,3 +33,5 @@ namespace cuda_mango {
     };
 
 }
+
+#endif

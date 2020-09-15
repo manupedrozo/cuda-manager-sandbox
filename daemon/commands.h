@@ -1,3 +1,6 @@
+#ifndef COMMANDS_H
+#define COMMANDS_H
+
 #include <string.h>
 
 namespace cuda_mango {
@@ -103,4 +106,6 @@ namespace cuda_mango {
         cmd.cmd = ALLOC_MEM_SUCCESS;
         cmd.mem_id = mem_id;
     }
-};
+}
+
+#endif

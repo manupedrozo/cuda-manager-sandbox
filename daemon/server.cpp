@@ -11,68 +11,45 @@
 #include <iostream>
 #include <queue>
 
+#include "server.h"
 #include "commands.h"
 
 #define SOCKET_PATH "/tmp/server-test"
 
-#define BUFFER_SIZE 1024
 #define NO_SOCKET -1
-
-#define MAX_CONNECTIONS 10 // Max client connections
-#define POLLFDS_SIZE MAX_CONNECTIONS + 1 // Clients + listen socket
-#define LISTEN_IDX MAX_CONNECTIONS
 
 #define INSUFFICIENT_DATA -1
 #define UNKNOWN_COMMAND 0
 
-static bool running = true;
+void print_pollfds(pollfd *data, size_t size) {
+    printf("Pollfds\n");
+    for(int i = 0; i < size; i++) {
+        printf("pollfd_idx: %d, ", i);
+        printf("fd: %d, ", data[i].fd);
+        printf("events: %hi, ", data[i].events);
+        printf("revents: %hi\n", data[i].revents);
+    }
+}
 
-typedef struct {
-    void *buf;
-    size_t size;
-} message_t;
+namespace cuda_mango {
 
-typedef struct {
-    message_t *msg;
-    size_t byte_offset;
-} sending_message_t;
-
-typedef struct {
-    char buf[BUFFER_SIZE];
-    size_t byte_offset;
-} receiving_message_t;
-
-typedef struct {
-    bool waiting;
-    message_t *msg;
-    size_t byte_offset;
-} receiving_data_t;
-
-static pollfd                   pollfds[POLLFDS_SIZE];                  // Sockets to poll. Listen socket + client connections.
-
-static std::queue<message_t *>  message_queues[MAX_CONNECTIONS];        // Messages queued to send
-static sending_message_t        sending_messages[MAX_CONNECTIONS];      // Message in process of being sent to the client
-
-static receiving_message_t      receiving_messages[MAX_CONNECTIONS];    // Message in process of being received from the client
-static receiving_data_t         receiving_data[MAX_CONNECTIONS];        // Unstructured data being received
-
-void handle_hello_command(const cuda_mango::hello_command_t *cmd) {
+void Server::handle_hello_command(const cuda_mango::hello_command_t *cmd) {
     printf("%s\n", cmd->message);
 }
 
-void handle_end_command(const cuda_mango::command_base_t *cmd) {
+void Server::handle_end_command(const cuda_mango::command_base_t *cmd) {
     (void) (cmd);
     running = false;
 }
 
-void handle_variable_length_command(int fd_idx, const cuda_mango::variable_length_command_t *cmd) {
+void Server::handle_variable_length_command(int fd_idx, const cuda_mango::variable_length_command_t *cmd) {
     receiving_data[fd_idx].waiting = true;
     receiving_data[fd_idx].msg = (message_t*) malloc(sizeof(message_t));
     receiving_data[fd_idx].msg->buf = malloc(cmd->size);
     receiving_data[fd_idx].msg->size = cmd->size;
 }
 
-int handle_command(int fd_idx, const char *buffer, size_t size) {
+int Server::handle_command(int fd_idx, const char *buffer, size_t size) {
     if (size < sizeof(cuda_mango::command_base_t)) {
         return INSUFFICIENT_DATA; // Need to read more data to determine a command
     }
@@ -106,7 +83,7 @@ int handle_command(int fd_idx, const char *buffer, size_t size) {
     }
 }
 
-void handle_data_transfer_end(int fd_idx) {
+void Server::handle_data_transfer_end(int fd_idx) {
     receiving_data[fd_idx].waiting = false;
     receiving_data[fd_idx].byte_offset = 0;
 
@@ -119,15 +96,7 @@ void handle_data_transfer_end(int fd_idx) {
     receiving_data[fd_idx].msg = NULL;
 }
 
-void initialize_pollfds() {
-    for (int i = 0; i < POLLFDS_SIZE; i++) {
-        pollfds[i].fd = NO_SOCKET;
-        pollfds[i].events = 0;
-        pollfds[i].revents = 0;
-    }
-}
-
-void reset_socket_structs(int fd_idx) {
+void Server::reset_socket_structs(int fd_idx) {
     pollfds[fd_idx].fd = NO_SOCKET;
     pollfds[fd_idx].events = 0;
     pollfds[fd_idx].revents = 0;
@@ -154,24 +123,24 @@ void reset_socket_structs(int fd_idx) {
     }
 }
 
-void close_socket(int fd_idx) {
+void Server::close_socket(int fd_idx) {
     printf("close: Closing socket %d\n", fd_idx);
     close(pollfds[fd_idx].fd);
-    if (fd_idx != LISTEN_IDX) {
+    if (fd_idx != listen_idx) {
         reset_socket_structs(fd_idx);
     }
 }
 
-void close_sockets() {
-    for(int i = 0; i < POLLFDS_SIZE; i++) {
+void Server::close_sockets() {
+    for(int i = 0; i < pollfds.size(); i++) {
         if(pollfds[i].fd != NO_SOCKET) {
             close_socket(i);
         }
     }
 }
 
-bool accept_new_connection() {
-    int server_fd = pollfds[LISTEN_IDX].fd;
+bool Server::accept_new_connection() {
+    int server_fd = pollfds[listen_idx].fd;
     int new_socket = accept(server_fd, NULL, NULL);
     if (new_socket < 0) {
         if(errno == EAGAIN || errno == EWOULDBLOCK) {
@@ -183,7 +152,7 @@ bool accept_new_connection() {
         }
     }
     int new_socket_idx = -1;
-    for(int i = 0; i < MAX_CONNECTIONS; i++) {
+    for(int i = 0; i < max_connections; i++) {
         if(pollfds[i].fd == NO_SOCKET) {
             new_socket_idx = i;
         }
@@ -200,7 +169,7 @@ bool accept_new_connection() {
     return true;
 }
 
-void send_ack(int fd_idx) {
+void Server::send_ack(int fd_idx) {
     cuda_mango::command_base_t *response = (cuda_mango::command_base_t *) malloc(sizeof(cuda_mango::command_base_t));
     cuda_mango::init_ack_command(*response);
     message_t *msg = (message_t *) malloc(sizeof(message_t));
@@ -209,7 +178,7 @@ void send_ack(int fd_idx) {
     message_queues[fd_idx].push(msg);
 }
 
-bool consume_message_buffer(int fd_idx) {
+bool Server::consume_message_buffer(int fd_idx) {
     size_t buffer_start = 0;
             
     do {
@@ -246,7 +215,7 @@ bool consume_message_buffer(int fd_idx) {
     return true;
 }
 
-void consume_data_buffer(int fd_idx) {
+void Server::consume_data_buffer(int fd_idx) {
     size_t offset = receiving_data[fd_idx].byte_offset;
     size_t expected_size = receiving_data[fd_idx].msg->size;
     if (offset == expected_size) {
@@ -255,7 +224,7 @@ void consume_data_buffer(int fd_idx) {
     }
 }
 
-bool receive_on_socket(int fd_idx) {
+bool Server::receive_on_socket(int fd_idx) {
     printf("receive: Receiving on socket %d\n", fd_idx);
     int fd = pollfds[fd_idx].fd;
 
@@ -297,7 +266,7 @@ bool receive_on_socket(int fd_idx) {
     }
 }
 
-bool send_on_socket(int fd_idx) {
+bool Server::send_on_socket(int fd_idx) {
     printf("send: Sending data to %d\n", fd_idx);
     auto &curr_msg = sending_messages[fd_idx];
     auto &queue = message_queues[fd_idx];
@@ -334,8 +303,8 @@ bool send_on_socket(int fd_idx) {
     return true;
 }
 
-void check_for_writes() {
-    for(int i = 0; i < MAX_CONNECTIONS; i++) {
+void Server::check_for_writes() {
+    for(int i = 0; i < max_connections; i++) {
         if(!message_queues[i].empty() || sending_messages[i].msg != NULL) {
             pollfds[i].events |= POLLOUT;
         } else {
@@ -344,11 +313,15 @@ void check_for_writes() {
     }
 }
 
-void initialize_server() {
-    initialize_pollfds();
+void Server::initialize_server() {
+    for(auto& pollfd: pollfds) {
+        pollfd.fd = NO_SOCKET;
+        pollfd.events = 0;
+        pollfd.revents = 0;
+    }
 
-    int &server_fd = pollfds[LISTEN_IDX].fd;
-    pollfds[LISTEN_IDX].events = POLLIN | POLLPRI;
+    int server_fd = -1;
+    pollfds[listen_idx].events = POLLIN | POLLPRI;
 
     if ((server_fd = socket(AF_UNIX, SOCK_STREAM, 0)) == 0) { 
         perror("init (socket)"); 
@@ -360,7 +333,7 @@ void initialize_server() {
 
     struct sockaddr_un address;
     address.sun_family = AF_UNIX; 
-    strcpy(address.sun_path, SOCKET_PATH);
+    strcpy(address.sun_path, socket_path);
 
     unlink(address.sun_path);
        
@@ -373,25 +346,27 @@ void initialize_server() {
         perror("init (listen)"); 
         exit(EXIT_FAILURE); 
     } 
+
+    pollfds[listen_idx].fd = server_fd;
 }
 
-void server_loop() {
+void Server::server_loop() {
     int loop = 0;
 
     while(running) {
         check_for_writes();
-        int events = poll(pollfds, POLLFDS_SIZE, -1 /* -1 == block until events are received */); 
 
+        int events = poll(pollfds.data(), pollfds.size(), -1 /* -1 == block until events are received */); 
         if (events == -1) {
             perror("loop (poll)");
             exit(EXIT_FAILURE);
         }
 
-        for(int i = 0, events_left = events; i < POLLFDS_SIZE && events_left > 0; i++) {
+        for(int i = 0, events_left = events; i < pollfds.size() && events_left > 0; i++) {
             if(pollfds[i].revents) {
                 auto socket_events = pollfds[i].revents;
                 if(socket_events & POLLIN) { // Ready to read
-                    if(i == LISTEN_IDX) { // Listen socket, new connection available
+                    if(i == listen_idx) { // Listen socket, new connection available
                         if(!accept_new_connection()) {
                             printf("(loop %d) Accept error, closing socket\n", loop);
                             close_sockets();
@@ -446,17 +421,29 @@ void server_loop() {
     }     
 }
 
-void end_server() {
+void Server::end_server() {
     printf("end: Finishing up\n");
     close_sockets();
 }   
 
-int main(int argc, char const *argv[]) { 
+Server::Server(const char *socket_path, int max_connections): socket_path(socket_path), max_connections(max_connections) {
     initialize_server();
+}
 
-    server_loop();
-
+Server::~Server() {
     end_server();
+}
+
+void Server::start() {
+    server_loop();
+}
+
+}
+
+int main(int argc, char const *argv[]) { 
+    cuda_mango::Server server(SOCKET_PATH, 10);
+
+    server.start();
     
     return 0; 
 } 
