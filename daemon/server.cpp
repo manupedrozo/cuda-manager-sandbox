@@ -14,12 +14,7 @@
 #include "server.h"
 #include "commands.h"
 
-#define SOCKET_PATH "/tmp/server-test"
-
 #define NO_SOCKET -1
-
-#define INSUFFICIENT_DATA -1
-#define UNKNOWN_COMMAND 0
 
 void print_pollfds(pollfd *data, size_t size) {
     printf("Pollfds\n");
@@ -33,67 +28,26 @@ void print_pollfds(pollfd *data, size_t size) {
 
 namespace cuda_mango {
 
-void Server::handle_hello_command(const cuda_mango::hello_command_t *cmd) {
-    printf("%s\n", cmd->message);
-}
-
-void Server::handle_end_command(const cuda_mango::command_base_t *cmd) {
-    (void) (cmd);
-    running = false;
-}
-
-void Server::handle_variable_length_command(int fd_idx, const cuda_mango::variable_length_command_t *cmd) {
+void Server::prepare_for_data_packet(int fd_idx, size_t size) {
     receiving_data[fd_idx].waiting = true;
     receiving_data[fd_idx].msg = (message_t*) malloc(sizeof(message_t));
-    receiving_data[fd_idx].msg->buf = malloc(cmd->size);
-    receiving_data[fd_idx].msg->size = cmd->size;
-}
-
-int Server::handle_command(int fd_idx, const char *buffer, size_t size) {
-    if (size < sizeof(cuda_mango::command_base_t)) {
-        return INSUFFICIENT_DATA; // Need to read more data to determine a command
-    }
-    cuda_mango::command_base_t *base = (cuda_mango::command_base_t *) buffer;
-    switch (base->cmd) {
-        case cuda_mango::HELLO:
-            if (size >= sizeof(cuda_mango::hello_command_t)) {
-                handle_hello_command((cuda_mango::hello_command_t *) buffer);
-                return sizeof(cuda_mango::hello_command_t);
-            }
-            return INSUFFICIENT_DATA;
-            break;
-        case cuda_mango::END:
-            if (size >= sizeof(cuda_mango::command_base_t)) {
-                handle_end_command((cuda_mango::command_base_t *) buffer);
-                return sizeof(cuda_mango::command_base_t);
-            }
-            return INSUFFICIENT_DATA;
-            break;
-        case cuda_mango::VARIABLE:
-            if (size >= sizeof(cuda_mango::variable_length_command_t)) {
-                handle_variable_length_command(fd_idx, (cuda_mango::variable_length_command_t *) buffer);
-                return sizeof(cuda_mango::variable_length_command_t);
-            }
-            return INSUFFICIENT_DATA;
-            break;
-        default:
-            printf("handle: Unknown command\n");
-            return UNKNOWN_COMMAND;
-            break;
-    }
+    receiving_data[fd_idx].msg->buf = malloc(size);
+    receiving_data[fd_idx].msg->size = size;
 }
 
 void Server::handle_data_transfer_end(int fd_idx) {
+    if (!data_listener) {
+        printf("No data_listener set\n");
+        exit(EXIT_FAILURE);
+    }
+    // Data listener is responsible for freeing the buffer.
+    data_listener(receiving_data[fd_idx].msg->buf, receiving_data[fd_idx].msg->size);
+
     receiving_data[fd_idx].waiting = false;
     receiving_data[fd_idx].byte_offset = 0;
 
-    // Use data in some way, whatever we call here is responsible for freeing the buffer.
-        printf("Variable length data: \n%s\n", (char*) receiving_data[fd_idx].msg->buf);
-        free(receiving_data[fd_idx].msg->buf);
-    //
-
     free(receiving_data[fd_idx].msg);
-    receiving_data[fd_idx].msg = NULL;
+    receiving_data[fd_idx].msg = nullptr;
 }
 
 void Server::reset_socket_structs(int fd_idx) {
@@ -106,20 +60,20 @@ void Server::reset_socket_structs(int fd_idx) {
     message_queues[fd_idx].swap(empty);
     
     sending_messages[fd_idx].byte_offset = 0;
-    if (sending_messages[fd_idx].msg != NULL) {
+    if (sending_messages[fd_idx].msg != nullptr) {
         free(sending_messages[fd_idx].msg->buf);
         free(sending_messages[fd_idx].msg);
-        sending_messages[fd_idx].msg = NULL;
+        sending_messages[fd_idx].msg = nullptr;
     }
     
     receiving_messages[fd_idx].byte_offset = 0;
 
     receiving_data[fd_idx].waiting = false;
     receiving_data[fd_idx].byte_offset = 0;
-    if (receiving_data[fd_idx].msg != NULL) {
+    if (receiving_data[fd_idx].msg != nullptr) {
         free(receiving_data[fd_idx].msg->buf);
         free(receiving_data[fd_idx].msg);
-        receiving_data[fd_idx].msg = NULL;
+        receiving_data[fd_idx].msg = nullptr;
     }
 }
 
@@ -141,7 +95,7 @@ void Server::close_sockets() {
 
 bool Server::accept_new_connection() {
     int server_fd = pollfds[listen_idx].fd;
-    int new_socket = accept(server_fd, NULL, NULL);
+    int new_socket = accept(server_fd, nullptr, nullptr);
     if (new_socket < 0) {
         if(errno == EAGAIN || errno == EWOULDBLOCK) {
             printf("accept: No connection available, trying again later\n");
@@ -172,37 +126,41 @@ bool Server::accept_new_connection() {
 void Server::send_ack(int fd_idx) {
     cuda_mango::command_base_t *response = (cuda_mango::command_base_t *) malloc(sizeof(cuda_mango::command_base_t));
     cuda_mango::init_ack_command(*response);
-    message_t *msg = (message_t *) malloc(sizeof(message_t));
-    msg->buf = response;
-    msg->size = sizeof(cuda_mango::command_base_t);
-    message_queues[fd_idx].push(msg);
+    send_on_socket(fd_idx, response, sizeof(cuda_mango::command_base_t));
 }
 
 bool Server::consume_message_buffer(int fd_idx) {
     size_t buffer_start = 0;
             
     do {
+        if (!msg_listener) {
+            printf("No msg_listener set\n");
+            exit(EXIT_FAILURE);
+        }
         size_t usable_buffer_size = receiving_messages[fd_idx].byte_offset - buffer_start;
-        int res = handle_command(fd_idx, receiving_messages[fd_idx].buf + buffer_start, usable_buffer_size);
-        if (res == UNKNOWN_COMMAND) return false;
-        else if (res == INSUFFICIENT_DATA && usable_buffer_size == BUFFER_SIZE) {
+        command_result_t res = msg_listener(receiving_messages[fd_idx].buf + buffer_start, usable_buffer_size);
+        if (res.exit_code == UNKNOWN_COMMAND) return false;
+        else if (res.exit_code == INSUFFICIENT_DATA && usable_buffer_size == BUFFER_SIZE) {
             printf("receive: Buffer filled but a command couldn't be parsed\n");
             return false;
         }
-        else if (res == INSUFFICIENT_DATA) {
+        else if (res.exit_code == INSUFFICIENT_DATA) {
             memmove(receiving_messages[fd_idx].buf, receiving_messages[fd_idx].buf + buffer_start, usable_buffer_size);
             break;
         }
         else {
-            buffer_start += res;
+            buffer_start += res.bytes_consumed;
+            if (res.expect_data > 0) {
+                prepare_for_data_packet(fd_idx, res.expect_data);
+            }
             send_ack(fd_idx);
         }
 
         // it is possible that we handle a variable_length_command, which means that whatever is left on the buffer needs to be handled as pure data
         const bool data_in_buffer = receiving_data[fd_idx].waiting && buffer_start < receiving_messages[fd_idx].byte_offset;
         if (data_in_buffer) {
-            printf("Moving message buffer data to variable data buffer\n");
             size_t data_to_transfer = receiving_messages[fd_idx].byte_offset - buffer_start;
+            printf("Moving %li bytes of message buffer data to variable data buffer\n", data_to_transfer);
             void* data_buffer = (char*) receiving_data[fd_idx].msg->buf + receiving_data[fd_idx].byte_offset;
             memcpy(data_buffer, receiving_messages[fd_idx].buf + buffer_start, data_to_transfer);
             buffer_start = receiving_messages[fd_idx].byte_offset;
@@ -213,6 +171,13 @@ bool Server::consume_message_buffer(int fd_idx) {
     receiving_messages[fd_idx].byte_offset -= buffer_start;
 
     return true;
+}
+
+void Server::send_on_socket(int id, void *buf, size_t size) {
+    message_t *msg = (message_t *) malloc(sizeof(message_t));
+    msg->buf = buf;
+    msg->size = size;
+    message_queues[id].push(msg);
 }
 
 void Server::consume_data_buffer(int fd_idx) {
@@ -273,11 +238,11 @@ bool Server::send_on_socket(int fd_idx) {
     int fd = pollfds[fd_idx].fd;
 
     do {
-        if (curr_msg.msg == NULL && !queue.empty()) {
+        if (curr_msg.msg == nullptr && !queue.empty()) {
             curr_msg.msg = queue.front();
             queue.pop();
         }
-        if (curr_msg.msg != NULL) {
+        if (curr_msg.msg != nullptr) {
             size_t bytes_to_send = curr_msg.msg->size - curr_msg.byte_offset;
             ssize_t bytes_sent = send(fd, (char *) curr_msg.msg->buf + curr_msg.byte_offset, bytes_to_send, MSG_NOSIGNAL | MSG_DONTWAIT);
             if(bytes_sent == 0 || (bytes_sent < 0 && (errno == EAGAIN || errno == EWOULDBLOCK))) {
@@ -293,19 +258,19 @@ bool Server::send_on_socket(int fd_idx) {
                 if (curr_msg.byte_offset == curr_msg.msg->size) {
                     free(curr_msg.msg->buf);
                     free(curr_msg.msg);
-                    curr_msg.msg = NULL;
+                    curr_msg.msg = nullptr;
                     curr_msg.byte_offset = 0;
                 }
             }
         } 
-    } while (curr_msg.msg != NULL || !queue.empty());
+    } while (curr_msg.msg != nullptr || !queue.empty());
 
     return true;
 }
 
 void Server::check_for_writes() {
     for(int i = 0; i < max_connections; i++) {
-        if(!message_queues[i].empty() || sending_messages[i].msg != NULL) {
+        if(!message_queues[i].empty() || sending_messages[i].msg != nullptr) {
             pollfds[i].events |= POLLOUT;
         } else {
             pollfds[i].events &= ~POLLOUT;
@@ -313,7 +278,7 @@ void Server::check_for_writes() {
     }
 }
 
-void Server::initialize_server() {
+void Server::initialize_server(const char* socket_path) {
     for(auto& pollfd: pollfds) {
         pollfd.fd = NO_SOCKET;
         pollfd.events = 0;
@@ -426,8 +391,11 @@ void Server::end_server() {
     close_sockets();
 }   
 
-Server::Server(const char *socket_path, int max_connections): socket_path(socket_path), max_connections(max_connections) {
-    initialize_server();
+Server::Server(
+    const char *socket_path, 
+    int max_connections
+): max_connections(max_connections) {
+    initialize_server(socket_path);
 }
 
 Server::~Server() {
@@ -435,15 +403,15 @@ Server::~Server() {
 }
 
 void Server::start() {
+    if (!msg_listener) {
+        printf("No msg_listener set\n");
+        exit(EXIT_FAILURE);
+    }
+    if (!data_listener) {
+        printf("No data_listener set\n");
+        exit(EXIT_FAILURE);
+    }
     server_loop();
 }
 
-}
-
-int main(int argc, char const *argv[]) { 
-    cuda_mango::Server server(SOCKET_PATH, 10);
-
-    server.start();
-    
-    return 0; 
-} 
+} //namespace cuda_mango

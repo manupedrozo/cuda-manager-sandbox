@@ -4,7 +4,7 @@ project(daemon LANGUAGES CXX)
 
 set (CMAKE_CXX_STANDARD 14)
 
-set(SERVER_SRC server.cpp)
+set(SERVER_SRC server.cpp test/server-example.cpp)
 set(CLIENT_1_SRC socket_client.cpp test/client-hello.cpp)
 set(CLIENT_2_SRC socket_client.cpp test/client-continous.cpp)
 set(CLIENT_3_SRC socket_client.cpp test/client-variable-length.cpp)
