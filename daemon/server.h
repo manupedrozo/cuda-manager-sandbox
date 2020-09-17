@@ -6,6 +6,7 @@
 #include <vector>
 #include <functional>
 #include <poll.h>
+#include <memory>
 
 namespace cuda_mango {
     
@@ -30,8 +31,8 @@ class Server {
         } message_result_t;
 
         typedef struct {
-            message_t msg; // Message that asked for extra data to be read
-            message_t extra_data; // Plain byte array
+            message_t msg;          // Message that asked for extra data to be read
+            message_t extra_data;   // Plain byte array
         } packet_t;
 
         /*
@@ -93,35 +94,73 @@ class Server {
             size_t byte_offset;
         } receiving_data_t;
 
+        class Socket {
+            public:
+                typedef std::function<Server::message_result_t(message_t)> socket_msg_listener_t;
+                typedef std::function<void(packet_t)> socket_data_listener_t;
+
+                Socket(int fd);
+                ~Socket();
+
+                bool wants_to_write();
+                bool send_messages();
+                bool receive_messages();
+                
+                inline void queue_message(message_t msg) {
+                    message_queue.push(msg);
+                }
+
+                inline void set_message_listener(socket_msg_listener_t msg_listener) {
+                    this->msg_listener = msg_listener;
+                }
+
+                inline void remove_message_listener() {
+                    this->msg_listener = nullptr;
+                }
+                
+                inline void set_data_listener(socket_data_listener_t data_listener) {
+                    this->data_listener = data_listener;
+                }
+
+                inline void remove_data_listener() {
+                    this->data_listener = nullptr;
+                }
+
+            private:
+                const int fd;
+
+                std::queue<message_t> message_queue = std::queue<message_t>();  // Messages queued to send
+                sending_message_t sending_message;                              // Message in process of being sent to the client
+
+                receiving_message_t receiving_message;                          // Message in process of being received from the client
+                receiving_data_t receiving_data;                                // Unstructured data being received
+
+                socket_msg_listener_t msg_listener;
+                socket_data_listener_t data_listener;
+
+                bool consume_message_buffer();
+                void consume_data_buffer();
+                void prepare_for_data_packet(size_t size, message_t msg);
+                void handle_data_transfer_end();
+        };
+
         msg_listener_t msg_listener;
         data_listener_t data_listener;
         const int max_connections;
         const int listen_idx = max_connections;
         bool running = false;
 
-        std::vector<pollfd>                     pollfds = std::vector<pollfd>(max_connections + 1);                         // Sockets to poll. Listen socket + client connections.
+        std::vector<pollfd> pollfds = std::vector<pollfd>(max_connections + 1); // Sockets to poll. Listen socket + client connections.
 
-        std::vector<std::queue<message_t>>      message_queues = std::vector<std::queue<message_t>>(max_connections);     // Messages queued to send
-        std::vector<sending_message_t>          sending_messages = std::vector<sending_message_t>(max_connections);         // Message in process of being sent to the client
-
-        std::vector<receiving_message_t>        receiving_messages = std::vector<receiving_message_t>(max_connections);     // Message in process of being received from the client
-        std::vector<receiving_data_t>           receiving_data = std::vector<receiving_data_t>(max_connections);            // Unstructured data being received
+        std::vector<std::unique_ptr<Server::Socket>> sockets = std::vector<std::unique_ptr<Server::Socket>>(max_connections);        
 
         void server_loop();
         void initialize_server(const char* socket_path);
         void end_server();
         void check_for_writes();
-        bool send_messages(int fd_idx);
-        bool receive_messages(int fd_idx);
-        bool consume_message_buffer(int fd_idx);
-        void consume_data_buffer(int fd_idx);
-        void send_ack(int fd_idx);
         bool accept_new_connection();
         void close_sockets();
         void close_socket(int fd_idx);
-        void reset_socket_structs(int fd_idx);
-        void handle_data_transfer_end(int fd_idx);
-        void prepare_for_data_packet(int fd_idx, size_t size, message_t msg);
 };
 
 } // namespace cuda_mango
