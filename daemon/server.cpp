@@ -8,11 +8,9 @@
 #include <stdlib.h> 
 #include <string.h> 
 #include <errno.h>
-#include <iostream>
 #include <queue>
 
 #include "server.h"
-#include "commands.h"
 
 #define NO_SOCKET -1
 
@@ -28,11 +26,12 @@ void print_pollfds(pollfd *data, size_t size) {
 
 namespace cuda_mango {
 
-void Server::prepare_for_data_packet(int fd_idx, size_t size) {
+void Server::prepare_for_data_packet(int fd_idx, size_t size, message_t msg) {
     receiving_data[fd_idx].waiting = true;
-    receiving_data[fd_idx].msg = (message_t*) malloc(sizeof(message_t));
-    receiving_data[fd_idx].msg->buf = malloc(size);
-    receiving_data[fd_idx].msg->size = size;
+    receiving_data[fd_idx].data = { malloc(size), size };
+    void *msg_buf_copy = malloc(msg.size);
+    memcpy(msg_buf_copy, msg.buf, msg.size);
+    receiving_data[fd_idx].msg = { msg_buf_copy, msg.size };
 }
 
 void Server::handle_data_transfer_end(int fd_idx) {
@@ -40,14 +39,13 @@ void Server::handle_data_transfer_end(int fd_idx) {
         printf("No data_listener set\n");
         exit(EXIT_FAILURE);
     }
-    // Data listener is responsible for freeing the buffer.
-    data_listener(receiving_data[fd_idx].msg->buf, receiving_data[fd_idx].msg->size);
+    packet_t packet;
+    packet.msg = receiving_data[fd_idx].msg;
+    packet.extra_data = { receiving_data[fd_idx].data.buf, receiving_data[fd_idx].data.size };
+    data_listener(fd_idx, packet, *this);
 
     receiving_data[fd_idx].waiting = false;
     receiving_data[fd_idx].byte_offset = 0;
-
-    free(receiving_data[fd_idx].msg);
-    receiving_data[fd_idx].msg = nullptr;
 }
 
 void Server::reset_socket_structs(int fd_idx) {
@@ -55,25 +53,26 @@ void Server::reset_socket_structs(int fd_idx) {
     pollfds[fd_idx].events = 0;
     pollfds[fd_idx].revents = 0;
 
-    // No other way to empty the queue unless we want to dequeue over and over
-    std::queue<message_t *> empty;
-    message_queues[fd_idx].swap(empty);
+
+    for(int i = 0; i < message_queues[fd_idx].size(); i++) {
+        message_t m = message_queues[fd_idx].front();
+        free(m.buf);
+        message_queues[fd_idx].pop();
+    }
     
     sending_messages[fd_idx].byte_offset = 0;
-    if (sending_messages[fd_idx].msg != nullptr) {
-        free(sending_messages[fd_idx].msg->buf);
-        free(sending_messages[fd_idx].msg);
-        sending_messages[fd_idx].msg = nullptr;
+    if (sending_messages[fd_idx].in_progress) {
+        free(sending_messages[fd_idx].msg.buf);
+        sending_messages[fd_idx].in_progress = false;
     }
     
     receiving_messages[fd_idx].byte_offset = 0;
 
-    receiving_data[fd_idx].waiting = false;
-    receiving_data[fd_idx].byte_offset = 0;
-    if (receiving_data[fd_idx].msg != nullptr) {
-        free(receiving_data[fd_idx].msg->buf);
-        free(receiving_data[fd_idx].msg);
-        receiving_data[fd_idx].msg = nullptr;
+    
+    if (receiving_data[fd_idx].waiting) {
+        free(receiving_data[fd_idx].data.buf);
+        receiving_data[fd_idx].waiting = false;
+        receiving_data[fd_idx].byte_offset = 0;
     }
 }
 
@@ -123,12 +122,6 @@ bool Server::accept_new_connection() {
     return true;
 }
 
-void Server::send_ack(int fd_idx) {
-    cuda_mango::command_base_t *response = (cuda_mango::command_base_t *) malloc(sizeof(cuda_mango::command_base_t));
-    cuda_mango::init_ack_command(*response);
-    send_on_socket(fd_idx, response, sizeof(cuda_mango::command_base_t));
-}
-
 bool Server::consume_message_buffer(int fd_idx) {
     size_t buffer_start = 0;
             
@@ -138,8 +131,8 @@ bool Server::consume_message_buffer(int fd_idx) {
             exit(EXIT_FAILURE);
         }
         size_t usable_buffer_size = receiving_messages[fd_idx].byte_offset - buffer_start;
-        command_result_t res = msg_listener(receiving_messages[fd_idx].buf + buffer_start, usable_buffer_size);
-        if (res.exit_code == UNKNOWN_COMMAND) return false;
+        message_result_t res = msg_listener(fd_idx, {receiving_messages[fd_idx].buf + buffer_start, usable_buffer_size}, *this);
+        if (res.exit_code == UNKNOWN_MESSAGE) return false;
         else if (res.exit_code == INSUFFICIENT_DATA && usable_buffer_size == BUFFER_SIZE) {
             printf("receive: Buffer filled but a command couldn't be parsed\n");
             return false;
@@ -149,11 +142,10 @@ bool Server::consume_message_buffer(int fd_idx) {
             break;
         }
         else {
-            buffer_start += res.bytes_consumed;
             if (res.expect_data > 0) {
-                prepare_for_data_packet(fd_idx, res.expect_data);
+                prepare_for_data_packet(fd_idx, res.expect_data, {receiving_messages[fd_idx].buf + buffer_start, res.bytes_consumed});
             }
-            send_ack(fd_idx);
+            buffer_start += res.bytes_consumed;
         }
 
         // it is possible that we handle a variable_length_command, which means that whatever is left on the buffer needs to be handled as pure data
@@ -161,7 +153,7 @@ bool Server::consume_message_buffer(int fd_idx) {
         if (data_in_buffer) {
             size_t data_to_transfer = receiving_messages[fd_idx].byte_offset - buffer_start;
             printf("Moving %li bytes of message buffer data to variable data buffer\n", data_to_transfer);
-            void* data_buffer = (char*) receiving_data[fd_idx].msg->buf + receiving_data[fd_idx].byte_offset;
+            void* data_buffer = (char*) receiving_data[fd_idx].data.buf + receiving_data[fd_idx].byte_offset;
             memcpy(data_buffer, receiving_messages[fd_idx].buf + buffer_start, data_to_transfer);
             buffer_start = receiving_messages[fd_idx].byte_offset;
             receiving_data[fd_idx].byte_offset += data_to_transfer;
@@ -173,23 +165,19 @@ bool Server::consume_message_buffer(int fd_idx) {
     return true;
 }
 
-void Server::send_on_socket(int id, void *buf, size_t size) {
-    message_t *msg = (message_t *) malloc(sizeof(message_t));
-    msg->buf = buf;
-    msg->size = size;
+void Server::send_on_socket(int id, message_t msg) {
     message_queues[id].push(msg);
 }
 
 void Server::consume_data_buffer(int fd_idx) {
     size_t offset = receiving_data[fd_idx].byte_offset;
-    size_t expected_size = receiving_data[fd_idx].msg->size;
+    size_t expected_size = receiving_data[fd_idx].data.size;
     if (offset == expected_size) {
         handle_data_transfer_end(fd_idx);
-        send_ack(fd_idx);
     }
 }
 
-bool Server::receive_on_socket(int fd_idx) {
+bool Server::receive_messages(int fd_idx) {
     printf("receive: Receiving on socket %d\n", fd_idx);
     int fd = pollfds[fd_idx].fd;
 
@@ -199,8 +187,8 @@ bool Server::receive_on_socket(int fd_idx) {
         size_t size_max;
 
         if (waiting_for_data) {
-            buf = (char*) receiving_data[fd_idx].msg->buf + receiving_data[fd_idx].byte_offset;
-            size_max = receiving_data[fd_idx].msg->size - receiving_data[fd_idx].byte_offset;
+            buf = (char*) receiving_data[fd_idx].data.buf + receiving_data[fd_idx].byte_offset;
+            size_max = receiving_data[fd_idx].data.size - receiving_data[fd_idx].byte_offset;
         } else {
             buf = receiving_messages[fd_idx].buf + receiving_messages[fd_idx].byte_offset;
             size_max = BUFFER_SIZE - receiving_messages[fd_idx].byte_offset;
@@ -231,20 +219,21 @@ bool Server::receive_on_socket(int fd_idx) {
     }
 }
 
-bool Server::send_on_socket(int fd_idx) {
+bool Server::send_messages(int fd_idx) {
     printf("send: Sending data to %d\n", fd_idx);
     auto &curr_msg = sending_messages[fd_idx];
     auto &queue = message_queues[fd_idx];
     int fd = pollfds[fd_idx].fd;
 
     do {
-        if (curr_msg.msg == nullptr && !queue.empty()) {
+        if (!curr_msg.in_progress && !queue.empty()) {
             curr_msg.msg = queue.front();
             queue.pop();
+            curr_msg.in_progress = true;
         }
-        if (curr_msg.msg != nullptr) {
-            size_t bytes_to_send = curr_msg.msg->size - curr_msg.byte_offset;
-            ssize_t bytes_sent = send(fd, (char *) curr_msg.msg->buf + curr_msg.byte_offset, bytes_to_send, MSG_NOSIGNAL | MSG_DONTWAIT);
+        if (curr_msg.in_progress) {
+            size_t bytes_to_send = curr_msg.msg.size - curr_msg.byte_offset;
+            ssize_t bytes_sent = send(fd, (char *) curr_msg.msg.buf + curr_msg.byte_offset, bytes_to_send, MSG_NOSIGNAL | MSG_DONTWAIT);
             if(bytes_sent == 0 || (bytes_sent < 0 && (errno == EAGAIN || errno == EWOULDBLOCK))) {
                 printf("send: Can't send data right now, trying later\n");
                 break;
@@ -255,22 +244,21 @@ bool Server::send_on_socket(int fd_idx) {
             } else {
                 printf("send: %li bytes sent\n", bytes_sent);
                 curr_msg.byte_offset += bytes_sent;
-                if (curr_msg.byte_offset == curr_msg.msg->size) {
-                    free(curr_msg.msg->buf);
-                    free(curr_msg.msg);
-                    curr_msg.msg = nullptr;
+                if (curr_msg.byte_offset == curr_msg.msg.size) {
+                    free(curr_msg.msg.buf);
+                    curr_msg.in_progress = false;
                     curr_msg.byte_offset = 0;
                 }
             }
         } 
-    } while (curr_msg.msg != nullptr || !queue.empty());
+    } while (curr_msg.in_progress || !queue.empty());
 
     return true;
 }
 
 void Server::check_for_writes() {
     for(int i = 0; i < max_connections; i++) {
-        if(!message_queues[i].empty() || sending_messages[i].msg != nullptr) {
+        if(!message_queues[i].empty() || sending_messages[i].in_progress) {
             pollfds[i].events |= POLLOUT;
         } else {
             pollfds[i].events &= ~POLLOUT;
@@ -338,7 +326,7 @@ void Server::server_loop() {
                             exit(EXIT_FAILURE);
                         }
                     } else {
-                        if (!receive_on_socket(i)) {
+                        if (!receive_messages(i)) {
                             printf("(loop %d) Receive error, closing socket\n", loop);
                             close_socket(i);
                             events_left--;
@@ -347,7 +335,7 @@ void Server::server_loop() {
                     }
                 }
                 if(socket_events & POLLOUT) { // Ready to write
-                    if (!send_on_socket(i)) {
+                    if (!send_messages(i)) {
                         printf("(loop %d) Send error, closing socket\n", loop);
                         close_socket(i);
                         events_left--;
@@ -399,10 +387,12 @@ Server::Server(
 }
 
 Server::~Server() {
+    running = false;
     end_server();
 }
 
 void Server::start() {
+    if (!running) running = true;
     if (!msg_listener) {
         printf("No msg_listener set\n");
         exit(EXIT_FAILURE);
