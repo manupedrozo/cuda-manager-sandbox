@@ -108,6 +108,7 @@ bool Server::accept_new_connection() {
     for(int i = 0; i < max_connections; i++) {
         if(pollfds[i].fd == NO_SOCKET) {
             new_socket_idx = i;
+            break;
         }
     }
     if (new_socket_idx == -1) {
