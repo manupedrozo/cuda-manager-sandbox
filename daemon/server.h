@@ -13,7 +13,7 @@ namespace cuda_mango {
 class Server {
 
     public:
-        enum MessageListenerExitCode {
+        enum class MessageListenerExitCode {
             OK,
             INSUFFICIENT_DATA,
             UNKNOWN_MESSAGE,
@@ -96,6 +96,17 @@ class Server {
 
         class Socket {
             public:
+                enum class SendMessagesExitCode {
+                    OK,
+                    ERROR,
+                };
+
+                enum class ReceiveMessagesExitCode {
+                    OK,
+                    HANG_UP,
+                    ERROR,
+                };
+
                 typedef std::function<Server::message_result_t(message_t)> socket_msg_listener_t;
                 typedef std::function<void(packet_t)> socket_data_listener_t;
 
@@ -103,8 +114,8 @@ class Server {
                 ~Socket();
 
                 bool wants_to_write();
-                bool send_messages();
-                bool receive_messages();
+                SendMessagesExitCode send_messages();
+                ReceiveMessagesExitCode receive_messages();
                 
                 inline void queue_message(message_t msg) {
                     message_queue.push(msg);
@@ -138,8 +149,8 @@ class Server {
                 socket_msg_listener_t msg_listener;
                 socket_data_listener_t data_listener;
 
-                bool consume_message_buffer();
-                void consume_data_buffer();
+                ReceiveMessagesExitCode consume_message_buffer();
+                ReceiveMessagesExitCode consume_data_buffer();
         };
 
         msg_listener_t msg_listener;

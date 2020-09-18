@@ -14,24 +14,24 @@ cuda_mango::command_base_t *create_ack() {
 Server::message_result_t handle_hello_command(int id, const hello_command_t *cmd, Server &server) {
     printf("%s\n", cmd->message);
     server.send_on_socket(id, {create_ack(), sizeof(cuda_mango::command_base_t)});
-    return {Server::OK, sizeof(hello_command_t), 0};
+    return {Server::MessageListenerExitCode::OK, sizeof(hello_command_t), 0};
 }
 
 Server::message_result_t handle_end_command(int id, const command_base_t *cmd, Server &server) {
     (void) (cmd);
     server.send_on_socket(id, {create_ack(), sizeof(cuda_mango::command_base_t)});
     server.stop();
-    return {Server::OK, sizeof(command_base_t), 0};
+    return {Server::MessageListenerExitCode::OK, sizeof(command_base_t), 0};
 }
 
 Server::message_result_t handle_variable_length_command(int id, const variable_length_command_t *cmd, Server &server) {
     server.send_on_socket(id, {create_ack(), sizeof(cuda_mango::command_base_t)});
-    return {Server::OK, sizeof(variable_length_command_t), cmd->size}; // Ask to start reading size amount of bytes as plain data and return it via the data_listener
+    return {Server::MessageListenerExitCode::OK, sizeof(variable_length_command_t), cmd->size}; // Ask to start reading size amount of bytes as plain data and return it via the data_listener
 }
 
 Server::message_result_t handle_command(int id, Server::message_t msg, Server &server) {
     if (msg.size < sizeof(command_base_t)) {
-        return {Server::INSUFFICIENT_DATA, 0, 0}; // Need to read more data to determine a command
+        return {Server::MessageListenerExitCode::INSUFFICIENT_DATA, 0, 0}; // Need to read more data to determine a command
     }
     command_base_t *base = (command_base_t *) msg.buf;
     switch (base->cmd) {
@@ -39,23 +39,23 @@ Server::message_result_t handle_command(int id, Server::message_t msg, Server &s
             if (msg.size >= sizeof(hello_command_t)) {
                 return handle_hello_command(id, (hello_command_t *) msg.buf, server);
             }
-            return {Server::INSUFFICIENT_DATA, 0, 0};
+            return {Server::MessageListenerExitCode::INSUFFICIENT_DATA, 0, 0};
             break;
         case END:
             if (msg.size >= sizeof(command_base_t)) {
                 return handle_end_command(id, (command_base_t *)  msg.buf, server);
             }
-            return {Server::INSUFFICIENT_DATA, 0, 0};
+            return {Server::MessageListenerExitCode::INSUFFICIENT_DATA, 0, 0};
             break;
         case VARIABLE:
             if (msg.size >= sizeof(variable_length_command_t)) {
                 return handle_variable_length_command(id, (variable_length_command_t *)  msg.buf, server);
             }
-            return {Server::INSUFFICIENT_DATA, 0, 0};
+            return {Server::MessageListenerExitCode::INSUFFICIENT_DATA, 0, 0};
             break;
         default:
             printf("handle: Unknown command\n");
-            return {Server::UNKNOWN_MESSAGE, 0, 0};
+            return {Server::MessageListenerExitCode::UNKNOWN_MESSAGE, 0, 0};
             break;
     }
 }

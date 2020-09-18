@@ -147,20 +147,33 @@ void Server::server_loop() {
                             exit(EXIT_FAILURE);
                         }
                     } else {
-                        if (!sockets[i]->receive_messages()) {
-                            logger->error("server_loop ({}): Receive error", loop);
-                            close_socket(i);
-                            events_left--;
-                            continue;
+                        switch (sockets[i]->receive_messages()) {
+                            case Socket::ReceiveMessagesExitCode::ERROR:
+                                logger->error("server_loop ({}): Receive error", loop);
+                                close_socket(i);
+                                events_left--;
+                                continue;
+                                break;
+                            case Socket::ReceiveMessagesExitCode::HANG_UP:
+                                logger->info("server_loop ({}): Client closed connection on socket {}", loop, i);
+                                close_socket(i);
+                                events_left--;
+                                continue;
+                                break;
+                            case Socket::ReceiveMessagesExitCode::OK:
+                                break;
                         }
                     }
                 }
                 if(socket_events & POLLOUT) { // Ready to write
-                    if (!sockets[i]->send_messages()) {
-                        logger->error("server_loop ({}): Send error", loop);
-                        close_socket(i);
-                        events_left--;
-                        continue;
+                    switch(sockets[i]->send_messages()) {
+                        case Socket::SendMessagesExitCode::ERROR:
+                            logger->error("server_loop ({}): Send error", loop);
+                            close_socket(i);
+                            events_left--;
+                            continue;
+                        case Socket::SendMessagesExitCode::OK:
+                            break;
                     }
                 }
                 if(socket_events & POLLPRI) { // Exceptional condition (very rare)
@@ -217,11 +230,11 @@ void Server::start() {
     logger->info("Starting server");
     if (!running) running = true;
     if (!msg_listener) {
-        logger->critical("No msg_listener set");
+        logger->critical("start: No server msg_listener set");
         exit(EXIT_FAILURE);
     }
     if (!data_listener) {
-        logger->critical("No data_listener set");
+        logger->critical("start: No server data_listener set");
         exit(EXIT_FAILURE);
     }
     server_loop();
@@ -267,7 +280,7 @@ bool Server::Socket::wants_to_write() {
     return !message_queue.empty() || sending_message.in_progress;
 }
 
-bool Server::Socket::send_messages() {
+Server::Socket::SendMessagesExitCode Server::Socket::send_messages() {
     logger->debug("send: Sending data to {}", fd);
 
     do {
@@ -285,7 +298,7 @@ bool Server::Socket::send_messages() {
             }
             else if(bytes_sent < 0) {
                 logger->error("send: {}", strerror(errno));
-                return false;
+                return SendMessagesExitCode::ERROR;
             } else {
                 logger->trace("send: {} bytes sent", bytes_sent);
                 sending_message.byte_offset += bytes_sent;
@@ -298,10 +311,10 @@ bool Server::Socket::send_messages() {
         } 
     } while (sending_message.in_progress || !message_queue.empty());
 
-    return true;
+    return SendMessagesExitCode::OK;
 }
 
-bool Server::Socket::receive_messages() {
+Server::Socket::ReceiveMessagesExitCode Server::Socket::receive_messages() {
     logger->debug("receive: Receiving data on socket {}", fd);
 
     while(true) {
@@ -319,36 +332,36 @@ bool Server::Socket::receive_messages() {
 
         ssize_t bytes_read = recv(fd, buf, size_max, MSG_NOSIGNAL | MSG_DONTWAIT);
         if (bytes_read < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
-            return true;
+            return ReceiveMessagesExitCode::OK;
         }
         else if (bytes_read < 0) {
             logger->error("receive (read): {}", strerror(errno));
-            return false;
+            return ReceiveMessagesExitCode::ERROR;
         }
         else if(bytes_read == 0) {
             logger->debug("receive: 0 bytes received, got hang up on");
-            return false;
+            return ReceiveMessagesExitCode::HANG_UP;
         }
 
         logger->trace("receive: {} bytes received", bytes_read);
 
         if (waiting_for_data) {
             receiving_data.byte_offset += bytes_read;
-            consume_data_buffer();
+            return consume_data_buffer();
         } else {
             receiving_message.byte_offset += bytes_read;
-            if (!consume_message_buffer()) return false;
+            return consume_message_buffer();
         }
     }
 }
 
-void Server::Socket::consume_data_buffer() {
+Server::Socket::ReceiveMessagesExitCode Server::Socket::consume_data_buffer() {
     size_t offset = receiving_data.byte_offset;
     size_t expected_size = receiving_data.data.size;
     if (offset == expected_size) {
         if (!data_listener) {
-            logger->critical("No data_listener set");
-            exit(EXIT_FAILURE);
+            logger->critical("consume_data_buffer: No socket data_listener set");
+            return ReceiveMessagesExitCode::ERROR;
         }
         packet_t packet;
         packet.msg = receiving_data.msg;
@@ -358,53 +371,59 @@ void Server::Socket::consume_data_buffer() {
         receiving_data.waiting = false;
         receiving_data.byte_offset = 0;
     }
+    return ReceiveMessagesExitCode::OK;
 }
 
-bool Server::Socket::consume_message_buffer() {
+Server::Socket::ReceiveMessagesExitCode Server::Socket::consume_message_buffer() {
     size_t buffer_start = 0;
-            
+
+    bool more_data_needed = false;
     do {
         if (!msg_listener) {
-            logger->critical("No msg_listener set");
-            exit(EXIT_FAILURE);
+            logger->critical("consume_message_buffer: No socket msg_listener set");
+            return ReceiveMessagesExitCode::ERROR;
         }
         size_t usable_buffer_size = receiving_message.byte_offset - buffer_start;
         message_result_t res = msg_listener({receiving_message.buf + buffer_start, usable_buffer_size});
-        if (res.exit_code == UNKNOWN_MESSAGE) return false;
-        else if (res.exit_code == INSUFFICIENT_DATA && usable_buffer_size == BUFFER_SIZE) {
-            logger->error("receive: Buffer filled but a command couldn't be parsed");
-            return false;
+        switch(res.exit_code) {
+            case MessageListenerExitCode::UNKNOWN_MESSAGE:
+                return ReceiveMessagesExitCode::ERROR;
+                break;
+            case MessageListenerExitCode::INSUFFICIENT_DATA:
+                if (usable_buffer_size == BUFFER_SIZE) {
+                    logger->error("consume_message_buffer: Buffer filled but a command couldn't be parsed");
+                    return ReceiveMessagesExitCode::ERROR;
+                } else {
+                    memmove(receiving_message.buf, receiving_message.buf + buffer_start, usable_buffer_size);
+                    more_data_needed = true;
+                }
+                break;
+            case MessageListenerExitCode::OK:
+                if (res.expect_data > 0) {
+                    receiving_data.waiting = true;
+                    receiving_data.data = { malloc(res.expect_data), res.expect_data };
+                    void *msg_buf_copy = malloc(res.bytes_consumed);
+                    memcpy(msg_buf_copy, receiving_message.buf + buffer_start, res.bytes_consumed);
+                    receiving_data.msg = { msg_buf_copy, res.bytes_consumed };
+                }
+                buffer_start += res.bytes_consumed;
+                break;
         }
-        else if (res.exit_code == INSUFFICIENT_DATA) {
-            memmove(receiving_message.buf, receiving_message.buf + buffer_start, usable_buffer_size);
-            break;
-        }
-        else {
-            if (res.expect_data > 0) {
-                receiving_data.waiting = true;
-                receiving_data.data = { malloc(res.expect_data), res.expect_data };
-                void *msg_buf_copy = malloc(res.bytes_consumed);
-                memcpy(msg_buf_copy, receiving_message.buf + buffer_start, res.bytes_consumed);
-                receiving_data.msg = { msg_buf_copy, res.bytes_consumed };
-            }
-            buffer_start += res.bytes_consumed;
-        }
-
         // it is possible that we handle a variable_length_command, which means that whatever is left on the buffer needs to be handled as pure data
         const bool data_in_buffer = receiving_data.waiting && buffer_start < receiving_message.byte_offset;
         if (data_in_buffer) {
             size_t data_to_transfer = receiving_message.byte_offset - buffer_start;
-            logger->debug("Moving {} bytes of message buffer data to variable data buffer", data_to_transfer);
+            logger->debug("consume_message_buffer: Moving {} bytes of message buffer data to variable data buffer", data_to_transfer);
             void* data_buffer = (char*) receiving_data.data.buf + receiving_data.byte_offset;
             memcpy(data_buffer, receiving_message.buf + buffer_start, data_to_transfer);
             buffer_start = receiving_message.byte_offset;
             receiving_data.byte_offset += data_to_transfer;
         }
-    } while (buffer_start < receiving_message.byte_offset);
+    } while (buffer_start < receiving_message.byte_offset && !more_data_needed);
 
     receiving_message.byte_offset -= buffer_start;
 
-    return true;
+    return ReceiveMessagesExitCode::OK;
 }
 
 } //namespace cuda_mango
