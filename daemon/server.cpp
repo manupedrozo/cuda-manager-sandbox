@@ -19,6 +19,7 @@ namespace cuda_mango {
 static std::shared_ptr<Logger> logger = Logger::get_instance();
 
 void Server::close_socket(int fd_idx) {
+    logger->debug("close_socket: Closing socket {}", fd_idx);
     if (fd_idx != listen_idx) sockets[fd_idx] = nullptr;
     else close(pollfds[fd_idx].fd);
 
@@ -67,7 +68,7 @@ bool Server::accept_new_connection() {
     sockets[new_socket_idx]->set_message_listener([this, new_socket_idx] (message_t msg) { return this->msg_listener(new_socket_idx, msg, *this); });
     sockets[new_socket_idx]->set_data_listener([this, new_socket_idx] (packet_t packet) { return this->data_listener(new_socket_idx, packet, *this); });
 
-    logger->debug("accept: New connection on {} (fd = {})", new_socket_idx, new_socket);
+    logger->info("accept: New connection on {} (fd = {})", new_socket_idx, new_socket);
     return true;
 }
 
@@ -78,6 +79,7 @@ void Server::send_on_socket(int id, message_t msg) {
 void Server::check_for_writes() {
     for(int i = 0; i < max_connections; i++) {
         if (sockets[i] && sockets[i]->wants_to_write()) {
+            logger->debug("check_for_writes: Incoming data on socket {}", i);
             pollfds[i].events |= POLLOUT;
         } else {
             pollfds[i].events &= ~POLLOUT;
@@ -123,14 +125,14 @@ void Server::initialize_server(const char* socket_path) {
 }
 
 void Server::server_loop() {
-    int loop = 0;
+    unsigned int loop = 0;
 
     while(running) {
         check_for_writes();
 
         int events = poll(pollfds.data(), pollfds.size(), -1 /* -1 == block until events are received */); 
         if (events == -1) {
-            logger->critical("loop (poll): {}", strerror(errno));
+            logger->critical("server_loop (poll): {}", strerror(errno));
             exit(EXIT_FAILURE);
         }
 
@@ -140,13 +142,13 @@ void Server::server_loop() {
                 if(socket_events & POLLIN) { // Ready to read
                     if(i == listen_idx) { // Listen socket, new connection available
                         if(!accept_new_connection()) {
-                            logger->critical("(loop {}) Accept error, closing listen socket, ending server", loop);
+                            logger->critical("server_loop ({}): Accept error, ending server", loop);
                             close_sockets();
                             exit(EXIT_FAILURE);
                         }
                     } else {
                         if (!sockets[i]->receive_messages()) {
-                            logger->error("(loop {}) Receive error, closing socket", loop);
+                            logger->error("server_loop ({}): Receive error", loop);
                             close_socket(i);
                             events_left--;
                             continue;
@@ -155,32 +157,32 @@ void Server::server_loop() {
                 }
                 if(socket_events & POLLOUT) { // Ready to write
                     if (!sockets[i]->send_messages()) {
-                        logger->error("(loop {}) Send error, closing socket", loop);
+                        logger->error("server_loop ({}): Send error", loop);
                         close_socket(i);
                         events_left--;
                         continue;
                     }
                 }
                 if(socket_events & POLLPRI) { // Exceptional condition (very rare)
-                    logger->error("(loop {}) Exceptional condition on idx {}", loop, i);
+                    logger->error("server_loop ({}): Exceptional condition on idx {}", loop, i);
                     close_socket(i);
                     events_left--;
                     continue;
                 }
                 if(socket_events & POLLERR) { // Error / read end of pipe is closed
-                    logger->error("(loop {}) Error on idx {}", loop, i); // errno?
+                    logger->error("server_loop ({}): Error on idx {}", loop, i); // errno?
                     close_socket(i);
                     events_left--;
                     continue;
                 }
                 if(socket_events & POLLHUP) { // Other end closed connection, some data may be left to read
-                    logger->error("(loop {}) Got hang up on {}", loop, i);
+                    logger->error("server_loop ({}): Got hang up on {}", loop, i);
                     close_socket(i);
                     events_left--;
                     continue;
                 }
                 if(socket_events & POLLNVAL) { // Invalid request, fd not open
-                    logger->error("(loop {}) Socket {} at index {} is closed", loop, pollfds[i].fd, i);
+                    logger->error("server_loop ({}): Socket {} at index {} is closed", loop, pollfds[i].fd, i);
                     close_socket(i);
                     events_left--;
                     continue;
@@ -194,7 +196,6 @@ void Server::server_loop() {
 }
 
 void Server::end_server() {
-    logger->debug("end: Finishing up");
     close_sockets();
 }   
 
@@ -202,15 +203,18 @@ Server::Server(
     const char *socket_path, 
     int max_connections
 ): max_connections(max_connections) {
+    logger->info("Creating server on [{}] with a maximum of {} connections", socket_path, max_connections);
     initialize_server(socket_path);
 }
 
 Server::~Server() {
+    logger->info("Ending server");
     running = false;
     end_server();
 }
 
 void Server::start() {
+    logger->info("Starting server");
     if (!running) running = true;
     if (!msg_listener) {
         logger->critical("No msg_listener set");
@@ -283,7 +287,7 @@ bool Server::Socket::send_messages() {
                 logger->error("send: {}", strerror(errno));
                 return false;
             } else {
-                logger->debug("send: {} bytes sent", bytes_sent);
+                logger->trace("send: {} bytes sent", bytes_sent);
                 sending_message.byte_offset += bytes_sent;
                 if (sending_message.byte_offset == sending_message.msg.size) {
                     free(sending_message.msg.buf);
@@ -298,7 +302,7 @@ bool Server::Socket::send_messages() {
 }
 
 bool Server::Socket::receive_messages() {
-    logger->debug("receive: Receiving on socket {}", fd);
+    logger->debug("receive: Receiving data on socket {}", fd);
 
     while(true) {
         const bool waiting_for_data = receiving_data.waiting;
@@ -326,7 +330,7 @@ bool Server::Socket::receive_messages() {
             return false;
         }
 
-        logger->debug("receive: {} bytes received", bytes_read);
+        logger->trace("receive: {} bytes received", bytes_read);
 
         if (waiting_for_data) {
             receiving_data.byte_offset += bytes_read;
@@ -342,7 +346,17 @@ void Server::Socket::consume_data_buffer() {
     size_t offset = receiving_data.byte_offset;
     size_t expected_size = receiving_data.data.size;
     if (offset == expected_size) {
-        handle_data_transfer_end();
+        if (!data_listener) {
+            logger->critical("No data_listener set");
+            exit(EXIT_FAILURE);
+        }
+        packet_t packet;
+        packet.msg = receiving_data.msg;
+        packet.extra_data = { receiving_data.data.buf, receiving_data.data.size };
+        data_listener(packet);
+
+        receiving_data.waiting = false;
+        receiving_data.byte_offset = 0;
     }
 }
 
@@ -367,7 +381,11 @@ bool Server::Socket::consume_message_buffer() {
         }
         else {
             if (res.expect_data > 0) {
-                prepare_for_data_packet(res.expect_data, {receiving_message.buf + buffer_start, res.bytes_consumed});
+                receiving_data.waiting = true;
+                receiving_data.data = { malloc(res.expect_data), res.expect_data };
+                void *msg_buf_copy = malloc(res.bytes_consumed);
+                memcpy(msg_buf_copy, receiving_message.buf + buffer_start, res.bytes_consumed);
+                receiving_data.msg = { msg_buf_copy, res.bytes_consumed };
             }
             buffer_start += res.bytes_consumed;
         }
@@ -387,28 +405,6 @@ bool Server::Socket::consume_message_buffer() {
     receiving_message.byte_offset -= buffer_start;
 
     return true;
-}
-
-void Server::Socket::prepare_for_data_packet(size_t size, message_t msg) {
-    receiving_data.waiting = true;
-    receiving_data.data = { malloc(size), size };
-    void *msg_buf_copy = malloc(msg.size);
-    memcpy(msg_buf_copy, msg.buf, msg.size);
-    receiving_data.msg = { msg_buf_copy, msg.size };
-}
-
-void Server::Socket::handle_data_transfer_end() {
-    if (!data_listener) {
-        logger->critical("No data_listener set");
-        exit(EXIT_FAILURE);
-    }
-    packet_t packet;
-    packet.msg = receiving_data.msg;
-    packet.extra_data = { receiving_data.data.buf, receiving_data.data.size };
-    data_listener(packet);
-
-    receiving_data.waiting = false;
-    receiving_data.byte_offset = 0;
 }
 
 } //namespace cuda_mango

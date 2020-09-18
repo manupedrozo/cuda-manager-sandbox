@@ -140,8 +140,6 @@ class Server {
 
                 bool consume_message_buffer();
                 void consume_data_buffer();
-                void prepare_for_data_packet(size_t size, message_t msg);
-                void handle_data_transfer_end();
         };
 
         msg_listener_t msg_listener;
