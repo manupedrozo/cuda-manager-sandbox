@@ -4,7 +4,7 @@ project(daemon LANGUAGES CXX)
 
 set (CMAKE_CXX_STANDARD 14)
 
-set(SERVER_SRC server.cpp test/server-example.cpp)
+set(SERVER_SRC server.cpp test/server-example.cpp logger.cpp)
 set(CLIENT_1_SRC socket_client.cpp test/client-hello.cpp)
 set(CLIENT_2_SRC socket_client.cpp test/client-continous.cpp)
 set(CLIENT_3_SRC socket_client.cpp test/client-variable-length.cpp)
@@ -13,12 +13,16 @@ set(KILLER_SRC test/killer.cpp)
 
 set(COMMON_HEADERS commands.h)
 
+find_package(spdlog REQUIRED)
+
 add_executable(server ${SERVER_SRC})
 add_executable(client ${CLIENT_1_SRC})
 add_executable(client-continous ${CLIENT_2_SRC})
 add_executable(client-variable-length ${CLIENT_3_SRC})
 add_executable(client-multimessage ${CLIENT_4_SRC})
 add_executable(killer ${KILLER_SRC})
+
+target_link_libraries(server PRIVATE spdlog::spdlog)
 
 target_include_directories(server PRIVATE ${PROJECT_SOURCE_DIR})
 target_include_directories(client PRIVATE ${PROJECT_SOURCE_DIR})
