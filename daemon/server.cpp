@@ -2,12 +2,9 @@
 #include <fcntl.h>
 #include <sys/socket.h>
 #include <sys/types.h>
-#include <poll.h>
 #include <sys/un.h>
-#include <stdlib.h>
 #include <string.h>
 #include <errno.h>
-#include <queue>
 
 #include "server.h"
 #include "logger.h"
@@ -36,16 +33,16 @@ void Server::close_sockets() {
     }
 }
 
-bool Server::accept_new_connection() {
+Server::AcceptConnectionExitCode Server::accept_new_connection() {
     int server_fd = pollfds[listen_idx].fd;
     int new_socket = accept(server_fd, nullptr, nullptr);
     if (new_socket < 0) {
         if(errno == EAGAIN || errno == EWOULDBLOCK) {
-            logger->error("accept: No connection available, trying again later");
-            return true;
+            logger->debug("accept: No connection available, trying again later");
+            return AcceptConnectionExitCode::OK;
         } else {
             logger->error("accept: {}", strerror(errno));
-            return false;
+            return AcceptConnectionExitCode::ERROR;
         }
     }
     int new_socket_idx = -1;
@@ -58,18 +55,18 @@ bool Server::accept_new_connection() {
     if (new_socket_idx == -1) {
         logger->error("accept: Connection limit reached, rejecting connection");
         close(new_socket);
-        return true;
+        return AcceptConnectionExitCode::OK;
     }
     pollfds[new_socket_idx].fd = new_socket;
     pollfds[new_socket_idx].events = POLLIN | POLLPRI;
     pollfds[new_socket_idx].revents = 0;
     
-    sockets[new_socket_idx] = std::make_unique<Server::Socket>(new_socket);
-    sockets[new_socket_idx]->set_message_listener([this, new_socket_idx] (message_t msg) { return this->msg_listener(new_socket_idx, msg, *this); });
-    sockets[new_socket_idx]->set_data_listener([this, new_socket_idx] (packet_t packet) { return this->data_listener(new_socket_idx, packet, *this); });
+    auto socket_msg_listener = [this, new_socket_idx] (message_t msg) { return this->msg_listener(new_socket_idx, msg, *this); };
+    auto socket_data_listener = [this, new_socket_idx] (packet_t packet) { return this->data_listener(new_socket_idx, packet, *this); };
+    sockets[new_socket_idx] = std::make_unique<Server::Socket>(new_socket, socket_msg_listener, socket_data_listener);
 
     logger->info("accept: New connection on {} (fd = {})", new_socket_idx, new_socket);
-    return true;
+    return AcceptConnectionExitCode::OK;
 }
 
 void Server::send_on_socket(int id, message_t msg) {
@@ -87,7 +84,9 @@ void Server::check_for_writes() {
     }
 }
 
-void Server::initialize_server(const char* socket_path) {
+Server::InitExitCode Server::initialize() {
+    logger->info("initialize: Initializing server");
+
     for(auto& pollfd: pollfds) {
         pollfd.fd = NO_SOCKET;
         pollfd.events = 0;
@@ -98,8 +97,8 @@ void Server::initialize_server(const char* socket_path) {
     pollfds[listen_idx].events = POLLIN | POLLPRI;
 
     if ((server_fd = socket(AF_UNIX, SOCK_STREAM, 0)) == 0) { 
-        logger->critical("init (socket): {}", strerror(errno)); 
-        exit(EXIT_FAILURE); 
+        logger->critical("initialize (socket): {}", strerror(errno)); 
+        return InitExitCode::ERROR;
     } 
 
     int flags = fcntl(server_fd, F_GETFL);
@@ -107,24 +106,27 @@ void Server::initialize_server(const char* socket_path) {
 
     struct sockaddr_un address;
     address.sun_family = AF_UNIX; 
-    strcpy(address.sun_path, socket_path);
+    strcpy(address.sun_path, socket_path.c_str());
 
     unlink(address.sun_path);
        
     if (bind(server_fd, (struct sockaddr *) &address, sizeof(address)) < 0) { 
-        logger->critical("init (bind): {}", strerror(errno)); 
-        exit(EXIT_FAILURE); 
+        logger->critical("initialize (bind): {}", strerror(errno)); 
+        return InitExitCode::ERROR;
     } 
 
     if (listen(server_fd, 3) < 0)  { 
-        logger->critical("init (listen): {}", strerror(errno)); 
-        exit(EXIT_FAILURE); 
+        logger->critical("initialize (listen): {}", strerror(errno)); 
+        return InitExitCode::ERROR;
     } 
 
     pollfds[listen_idx].fd = server_fd;
+
+    initialized = true;
+    return InitExitCode::OK;
 }
 
-void Server::server_loop() {
+Server::StartExitCode Server::server_loop() {
     unsigned int loop = 0;
 
     while(running) {
@@ -133,7 +135,7 @@ void Server::server_loop() {
         int events = poll(pollfds.data(), pollfds.size(), -1 /* -1 == block until events are received */); 
         if (events == -1) {
             logger->critical("server_loop (poll): {}", strerror(errno));
-            exit(EXIT_FAILURE);
+            return StartExitCode::ERROR;
         }
 
         for(int i = 0, events_left = events; i < pollfds.size() && events_left > 0; i++) {
@@ -141,10 +143,14 @@ void Server::server_loop() {
                 auto socket_events = pollfds[i].revents;
                 if(socket_events & POLLIN) { // Ready to read
                     if(i == listen_idx) { // Listen socket, new connection available
-                        if(!accept_new_connection()) {
-                            logger->critical("server_loop ({}): Accept error, ending server", loop);
-                            close_sockets();
-                            exit(EXIT_FAILURE);
+                        switch (accept_new_connection()) {
+                            case Server::AcceptConnectionExitCode::ERROR:
+                                logger->critical("server_loop ({}): Accept error, ending server", loop);
+                                close_sockets();
+                                return StartExitCode::ERROR;
+                                break;
+                            case Server::AcceptConnectionExitCode::OK:
+                                break;
                         }
                     } else {
                         switch (sockets[i]->receive_messages()) {
@@ -206,6 +212,7 @@ void Server::server_loop() {
         }
         loop++;
     }     
+    return StartExitCode::OK;
 }
 
 void Server::end_server() {
@@ -213,11 +220,12 @@ void Server::end_server() {
 }   
 
 Server::Server(
-    const char *socket_path, 
-    int max_connections
-): max_connections(max_connections) {
+    std::string socket_path, 
+    int max_connections,
+    msg_listener_t message_listener,
+    data_listener_t data_listener
+): socket_path(socket_path), max_connections(max_connections), msg_listener(message_listener), data_listener(data_listener) {
     logger->info("Creating server on [{}] with a maximum of {} connections", socket_path, max_connections);
-    initialize_server(socket_path);
 }
 
 Server::~Server() {
@@ -226,21 +234,21 @@ Server::~Server() {
     end_server();
 }
 
-void Server::start() {
+Server::StartExitCode Server::start() {
+    if (!initialized) {
+        logger->error("start: Server not initialized");
+        return StartExitCode::ERROR;
+    }
     logger->info("Starting server");
     if (!running) running = true;
-    if (!msg_listener) {
-        logger->critical("start: No server msg_listener set");
-        exit(EXIT_FAILURE);
-    }
-    if (!data_listener) {
-        logger->critical("start: No server data_listener set");
-        exit(EXIT_FAILURE);
-    }
-    server_loop();
+    return server_loop();
 }
 
-Server::Socket::Socket(int fd): fd(fd) {
+Server::Socket::Socket(
+    int fd, 
+    socket_msg_listener_t msg_listener, 
+    socket_data_listener_t data_listener
+): fd(fd), msg_listener(msg_listener), data_listener(data_listener) {
     sending_message.byte_offset = 0;
     sending_message.msg.buf = nullptr;
     sending_message.msg.size = 0;
@@ -359,10 +367,6 @@ Server::Socket::ReceiveMessagesExitCode Server::Socket::consume_data_buffer() {
     size_t offset = receiving_data.byte_offset;
     size_t expected_size = receiving_data.data.size;
     if (offset == expected_size) {
-        if (!data_listener) {
-            logger->critical("consume_data_buffer: No socket data_listener set");
-            return ReceiveMessagesExitCode::ERROR;
-        }
         packet_t packet;
         packet.msg = receiving_data.msg;
         packet.extra_data = { receiving_data.data.buf, receiving_data.data.size };
@@ -379,10 +383,6 @@ Server::Socket::ReceiveMessagesExitCode Server::Socket::consume_message_buffer()
 
     bool more_data_needed = false;
     do {
-        if (!msg_listener) {
-            logger->critical("consume_message_buffer: No socket msg_listener set");
-            return ReceiveMessagesExitCode::ERROR;
-        }
         size_t usable_buffer_size = receiving_message.byte_offset - buffer_start;
         message_result_t res = msg_listener({receiving_message.buf + buffer_start, usable_buffer_size});
         switch(res.exit_code) {

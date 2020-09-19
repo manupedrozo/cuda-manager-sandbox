@@ -69,10 +69,8 @@ void data_listener(int id, Server::packet_t packet, Server &server) {
 }
 
 int main(int argc, char const *argv[]) { 
-    Server server(SOCKET_PATH, 10);
-
-    server.set_message_listener(handle_command);
-    server.set_data_listener(data_listener);
+    Server server(SOCKET_PATH, 10, handle_command, data_listener);
+    server.initialize();
 
     printf("Server initialized, starting loop...\n");
 
