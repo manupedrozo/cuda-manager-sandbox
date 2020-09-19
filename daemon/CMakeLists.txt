@@ -4,7 +4,7 @@ project(daemon LANGUAGES CXX)
 
 set (CMAKE_CXX_STANDARD 14)
 
-set(SERVER_SRC server.cpp test/server-example.cpp logger.cpp)
+set(SERVER_SRC server.cpp test/server-example.cpp logger.cpp config_reader.cpp)
 set(CLIENT_1_SRC socket_client.cpp test/client-hello.cpp)
 set(CLIENT_2_SRC socket_client.cpp test/client-continous.cpp)
 set(CLIENT_3_SRC socket_client.cpp test/client-variable-length.cpp)
@@ -24,11 +24,12 @@ add_executable(killer ${KILLER_SRC})
 
 target_link_libraries(server PRIVATE spdlog::spdlog)
 
-target_include_directories(server PRIVATE ${PROJECT_SOURCE_DIR})
-target_include_directories(client PRIVATE ${PROJECT_SOURCE_DIR})
-target_include_directories(client-continous PRIVATE ${PROJECT_SOURCE_DIR})
-target_include_directories(client-variable-length PRIVATE ${PROJECT_SOURCE_DIR})
-target_include_directories(client-multimessage PRIVATE ${PROJECT_SOURCE_DIR})
-target_include_directories(killer PRIVATE ${PROJECT_SOURCE_DIR})
+target_include_directories(server PRIVATE ${PROJECT_SOURCE_DIR} ${PROJECT_SOURCE_DIR}/external)
+target_include_directories(client PRIVATE ${PROJECT_SOURCE_DIR} ${PROJECT_SOURCE_DIR}/external)
+target_include_directories(client-continous PRIVATE ${PROJECT_SOURCE_DIR} ${PROJECT_SOURCE_DIR}/external)
+target_include_directories(client-variable-length PRIVATE ${PROJECT_SOURCE_DIR} ${PROJECT_SOURCE_DIR}/external)
+target_include_directories(client-multimessage PRIVATE ${PROJECT_SOURCE_DIR} ${PROJECT_SOURCE_DIR}/external)
+target_include_directories(killer PRIVATE ${PROJECT_SOURCE_DIR} ${PROJECT_SOURCE_DIR}/external)
 
 configure_file(lorem.txt lorem.txt COPYONLY)
+configure_file(daemon.conf.in daemon.conf COPYONLY)

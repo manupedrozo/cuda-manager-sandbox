@@ -1,7 +1,10 @@
 #include "server.h"
 #include "commands.h"
+#include "config_reader.h"
 
 #define SOCKET_PATH "/tmp/server-test"
+
+#define CONFIG_FILE "daemon.conf"
 
 using namespace cuda_mango;
 
@@ -69,10 +72,26 @@ void data_listener(int id, Server::packet_t packet, Server &server) {
 }
 
 int main(int argc, char const *argv[]) { 
+    daemon_config_t config;
+    auto config_res = ConfigReader::read_config(CONFIG_FILE, config);
+
+    auto &logger = Logger::get_instance();
+
+    if (config_res != ConfigReader::ExitCode::OK) {
+        if (config_res == ConfigReader::ExitCode::CANNOT_OPEN_FILE) {
+            logger.critical("Cannot open config file");
+        } else {
+            logger.critical("Error parsing config file");
+        }
+        return -1;
+    }
+
+    Logger::set_level(config.log_level);
+ 
     Server server(SOCKET_PATH, 10, handle_command, data_listener);
     server.initialize();
 
-    printf("Server initialized, starting loop...\n");
+    logger.info("Server initialized, starting loop...");
 
     server.start();
     

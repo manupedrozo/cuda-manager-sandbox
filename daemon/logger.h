@@ -9,7 +9,20 @@ namespace cuda_mango {
     class Logger {
 
         public:
-            static std::shared_ptr<Logger> get_instance();
+            enum class Level {
+                TRACE,
+                DEBUG,
+                INFO,
+                WARN,
+                ERROR,
+                CRITICAL,
+                OFF
+            };
+
+            Logger(const Logger&) = delete;
+
+            static void set_level(Level level);
+            static Logger& get_instance();
 
             template<typename FormatString, typename... Args>
             inline void trace(const FormatString &fmt, const Args &... args)
@@ -84,7 +97,7 @@ namespace cuda_mango {
             }
 
         private:
-            static std::shared_ptr<Logger> instance;
+            static spdlog::level::level_enum level;
             std::unique_ptr<spdlog::logger> logger;
 
             Logger();
