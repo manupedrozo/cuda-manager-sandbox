@@ -92,7 +92,7 @@ void CudaManager::launch_kernel(const CUfunction kernel, const std::vector<Arg *
         kernel_args, 0) // args, extras
       );
 
-  // Syncronize
+  // Synchronize
   CUDA_SAFE_CALL(cuCtxSynchronize());
 
   std::cout << "Execution complete!\n";

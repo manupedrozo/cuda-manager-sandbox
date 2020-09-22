@@ -26,6 +26,8 @@ namespace cuda_mango {
 
             CudaClient::ExitCode memory_read(int id, void *buf, size_t size);
 
+            CudaClient::ExitCode launch_kernel(char *arg_string, size_t size);
+
         private:
             int socket_fd;
 

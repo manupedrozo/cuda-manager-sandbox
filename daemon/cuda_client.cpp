@@ -81,5 +81,25 @@ namespace cuda_mango {
 
         return OK;
     }
+
+    CudaClient::ExitCode CudaClient::launch_kernel(char *arg_string, size_t size) {
+        CHECK_OPEN_SOCKET
+
+        variable_length_command_t cmd;
+        init_variable_length_command(cmd, size);
+
+        TRY_OR_CLOSE(send_on_socket(socket_fd, &cmd, sizeof(cmd)))
+
+        command_base_t res;
+
+        TRY_OR_CLOSE(receive_on_socket(socket_fd, &res, sizeof(res)))
+
+        // Might not want to send it all at once
+        TRY_OR_CLOSE(send_on_socket(socket_fd, arg_string, size));
+
+        TRY_OR_CLOSE(receive_on_socket(socket_fd, &res, sizeof(res)))
+
+        return OK;
+    }
     
 }

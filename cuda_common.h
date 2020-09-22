@@ -1,8 +1,8 @@
 #ifndef CUDA_COMMON
 #define CUDA_COMMON
 
-#include <nvrtc.h>
-#include <cuda.h>
+//#include <nvrtc.h>
+//#include <cuda.h>
 #include <iostream>
 
 #define CUDA_SAFE_CALL(x)                                         \
