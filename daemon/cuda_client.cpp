@@ -64,6 +64,9 @@ namespace cuda_mango {
 
         TRY_OR_CLOSE(send_on_socket(socket_fd, &cmd, sizeof(cmd)))
 
+        command_base_t res;
+        TRY_OR_CLOSE(receive_on_socket(socket_fd, &res, sizeof(res)))
+
         TRY_OR_CLOSE(send_on_socket(socket_fd, buf, size))
 
         return OK;
@@ -85,8 +88,8 @@ namespace cuda_mango {
     CudaClient::ExitCode CudaClient::launch_kernel(char *arg_string, size_t size) {
         CHECK_OPEN_SOCKET
 
-        variable_length_command_t cmd;
-        init_variable_length_command(cmd, size);
+        launch_kernel_command_t cmd;
+        init_launch_kernel_command(cmd, size);
 
         TRY_OR_CLOSE(send_on_socket(socket_fd, &cmd, sizeof(cmd)))
 

@@ -36,6 +36,9 @@ int main(int argc, char const *argv[]) {
   printf("Allocated buffer y id: %d\n", yid);
   printf("Allocated buffer o id: %d\n", oid);
 
+  client.memory_write(xid, (void *) x, buffer_size);
+  client.memory_write(yid, (void *) y, buffer_size);
+
   // Arguments
   ValueArg<float> arg_a(a, sizeof(float), true);
   BufferArg arg_x(xid, buffer_size, true);
@@ -48,9 +51,12 @@ int main(int argc, char const *argv[]) {
   // Arguments to a string
   std::cout << "Arguments to string: \n";
   std::string _arguments = args_to_string(KERNEL_NAME, args);
-  size_t arg_size = _arguments.size();
+  size_t arg_size = _arguments.size() + 1; // + 1 for null terminator
   char *arguments = (char *) _arguments.c_str();
+  std::cout << "Arg size: " << arg_size << "\n";
   std::cout << arguments << "\n";
+
+  // Launch kernel
   client.launch_kernel(arguments, arg_size);
 
 

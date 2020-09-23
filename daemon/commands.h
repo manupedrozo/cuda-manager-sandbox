@@ -11,6 +11,7 @@ namespace cuda_mango {
         MEM_RELEASE,
         MEM_WRITE,
         MEM_READ,
+        LAUNCH_KERNEL,
         END,
         ACK,
 
@@ -57,6 +58,11 @@ namespace cuda_mango {
         size_t size;
     } memory_read_command_t;
 
+    typedef struct {
+        command_type cmd;
+        size_t size;
+    } launch_kernel_command_t;
+
     inline void init_end_command(command_base_t &cmd) {
         cmd.cmd = END;
     }
@@ -95,6 +101,11 @@ namespace cuda_mango {
     inline void init_memory_release_command(memory_release_command_t &cmd, int mem_id) {
         cmd.cmd = MEM_RELEASE;
         cmd.mem_id = mem_id;
+    }
+
+    inline void init_launch_kernel_command(launch_kernel_command_t &cmd, int size) {
+        cmd.cmd = LAUNCH_KERNEL;
+        cmd.size = size;
     }
 
     typedef struct {

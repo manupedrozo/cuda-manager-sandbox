@@ -1,4 +1,7 @@
 #include <map>
+#include <string.h>
+
+// @TODO Properly handle errors, e.g when buffer doesnt exist
 
 struct MemoryBuffer {
   int id;
@@ -20,4 +23,5 @@ public:
   int allocate_buffer(size_t size, void **result_ptr = nullptr);
   void deallocate_buffer(int id);
   MemoryBuffer get_buffer(int id);
+  void write_buffer(int id, void *data, size_t size);
 };

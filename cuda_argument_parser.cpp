@@ -86,6 +86,7 @@ bool parse_integer(int *position, const char *arguments, int *result) {
   return false;
 }
 
+// @TODO receive size to not depend on correctly terminated strings
 bool parse_arguments(const char *arguments, std::vector<Arg *> &args, char **kernel_path) {
   std::cout << "Parsing arguments: " << arguments << '\n';
 
@@ -184,7 +185,6 @@ std::string args_to_string(std::string kernel_path, std::vector<Arg *> args) {
       ss << ' ' << *(float *)arg->get_value_ptr();
     }
   }
-  
   return ss.str();
 }
 
