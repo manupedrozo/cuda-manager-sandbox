@@ -4,7 +4,7 @@
 #include <vector>
 #include <iostream>
 
-CudaManager::CudaManager() {
+CudaManager::CudaManager() : memory_manager() {
   std::cout << "Initializing CUDA Manager...\n";
   CUDA_SAFE_CALL(cuInit(0));
 
@@ -49,13 +49,16 @@ void CudaManager::launch_kernel(const CUfunction kernel, const std::vector<Arg *
   for (int i = 0; i < args.size(); ++i) {
     Arg *arg = args[i];
     if (arg->is_buffer) {
+      MemoryBuffer mem_buffer = memory_manager.get_buffer(arg->get_id());
+
       // Create cuda buffer and copy to device if its an input buffer
       // The buffer must be created inside the vector and then used as a reference
       // This allows us to use pointers to its members (d_ptr)
       buffers.push_back(CudaBuffer());
       CudaBuffer &cuda_buffer = buffers[buffers.size() - 1];
-      cuda_buffer.h_ptr = arg->get_value_ptr();
-      cuda_buffer.size  = arg->size;
+
+      cuda_buffer.h_ptr = mem_buffer.ptr;
+      cuda_buffer.size  = mem_buffer.size;
       cuda_buffer.is_in = arg->is_in;
       
       CUDA_SAFE_CALL(cuMemAlloc(&cuda_buffer.d_ptr, cuda_buffer.size));

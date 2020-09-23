@@ -126,6 +126,7 @@ bool parse_arguments(const char *arguments, std::vector<Arg *> &args, char **ker
           return false;
         }
 
+        /* Not a ptr any more
         // Ptr
         void *ptr;
         parse_correct = parse_pointer(&(++i), arguments, &ptr, true);
@@ -134,7 +135,22 @@ bool parse_arguments(const char *arguments, std::vector<Arg *> &args, char **ker
         args.push_back(arg);
 
         std::cout << "Buffer: is_in = " << is_in << " size = " << size << " ptr = " << ptr << '\n';
+        */
+
+        // Id
+        int id;
+        parse_correct = parse_integer(&(++i), arguments, &id);
+        if (!parse_correct) {
+            std::cerr << "Error: number expected (buffer id)\n";
+            return false;
+        }
+
+        Arg *arg = new BufferArg(id, (size_t)size, is_in);
+        args.push_back(arg);
+
+        std::cout << "Buffer: is_in = " << is_in << " size = " << size << " id = " << id << '\n';
       }
+
 
       // Number
       else if (is_number) {
@@ -162,7 +178,7 @@ std::string args_to_string(std::string kernel_path, std::vector<Arg *> args) {
 
   for (Arg *arg: args) {
     if (arg->is_buffer) {
-      ss << " b " << arg->is_in << ' ' << arg->size << ' ' << std::hex << arg->get_value_ptr() << std::dec;
+      ss << " b " << arg->is_in << ' ' << arg->size << ' ' << arg->get_id(); //<< std::hex << arg->get_value_ptr() << std::dec;
     } else {
       // Using only float since this is for testing purposes
       ss << ' ' << *(float *)arg->get_value_ptr();

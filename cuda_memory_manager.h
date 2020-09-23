@@ -1,6 +1,6 @@
 #include <map>
 
-struct Buffer {
+struct MemoryBuffer {
   int id;
   size_t size;
   void *ptr;
@@ -8,7 +8,7 @@ struct Buffer {
 
 class CudaMemoryManager {
 private:
-  std::map<int, Buffer> buffers;
+  std::map<int, MemoryBuffer> buffers;
   int buffer_count = 0;
 
 
@@ -17,6 +17,7 @@ public:
   CudaMemoryManager() {}
   ~CudaMemoryManager() {}
 
-  int allocate_buffer(size_t size);
+  int allocate_buffer(size_t size, void **result_ptr = nullptr);
   void deallocate_buffer(int id);
+  MemoryBuffer get_buffer(int id);
 };

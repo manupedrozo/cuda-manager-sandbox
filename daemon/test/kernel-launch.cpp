@@ -27,22 +27,23 @@ int main(int argc, char const *argv[]) {
     y[i] = static_cast<float>(i * 2);
   }
 
-  ValueArg<float> arg_a(a, sizeof(float), true);
-  BufferArg arg_x(x, buffer_size, true);
-  BufferArg arg_y(y, buffer_size, true);
-  BufferArg arg_o(o, buffer_size, false);
-  ValueArg<float> arg_n(n, sizeof(float), true);
-
-  std::vector<Arg *> args {&arg_a, &arg_x, &arg_y, &arg_o, &arg_n};
-
   // Allocate and write buffers
   int xid, yid, oid;
-  client.memory_allocate(buffer_size, xid);
-  client.memory_allocate(buffer_size, yid);
-  client.memory_allocate(buffer_size, oid);
+  client.memory_allocate(buffer_size, &xid);
+  client.memory_allocate(buffer_size, &yid);
+  client.memory_allocate(buffer_size, &oid);
   printf("Allocated buffer x id: %d\n", xid);
   printf("Allocated buffer y id: %d\n", yid);
   printf("Allocated buffer o id: %d\n", oid);
+
+  // Arguments
+  ValueArg<float> arg_a(a, sizeof(float), true);
+  BufferArg arg_x(xid, buffer_size, true);
+  BufferArg arg_y(yid, buffer_size, true);
+  BufferArg arg_o(oid, buffer_size, false);
+  ValueArg<float> arg_n(n, sizeof(float), true);
+
+  std::vector<Arg *> args {&arg_a, &arg_x, &arg_y, &arg_o, &arg_n};
 
   // Arguments to a string
   std::cout << "Arguments to string: \n";

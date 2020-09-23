@@ -18,7 +18,7 @@ namespace cuda_mango {
 
             ~CudaClient();
 
-            CudaClient::ExitCode memory_allocate(size_t size, int &mem_id);
+            CudaClient::ExitCode memory_allocate(size_t size, int *mem_id);
 
             CudaClient::ExitCode memory_release(int mem_id);
 

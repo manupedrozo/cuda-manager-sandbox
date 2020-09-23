@@ -24,8 +24,17 @@ void test_arg_parser() {
   // Setup input and output buffers
   size_t n = NUM_THREADS * NUM_BLOCKS;
   size_t buffer_size = n * sizeof(float);
+
+  // Allocate and write buffers
+  float *x, *y, *o;
+  int xid = cuda_manager.memory_manager.allocate_buffer(buffer_size, (void **) &x);
+  int yid = cuda_manager.memory_manager.allocate_buffer(buffer_size, (void **) &y);
+  int oid = cuda_manager.memory_manager.allocate_buffer(buffer_size, (void **) &o);
+  printf("Allocated buffer x id: %d, ptr: %p\n", xid, x);
+  printf("Allocated buffer y id: %d, ptr: %p\n", yid, y);
+  printf("Allocated buffer o id: %d, ptr: %p\n", oid, o);
+
   float a = 2.5f;
-  float *x = new float[n], *y = new float[n], *o = new float[n];
   
   for (size_t i = 0; i < n; ++i) {
     x[i] = static_cast<float>(i);
@@ -33,9 +42,9 @@ void test_arg_parser() {
   }
 
   ValueArg<float>  arg_a(a, sizeof(float), true);
-  BufferArg arg_x(x, buffer_size, true);
-  BufferArg arg_y(y, buffer_size, true);
-  BufferArg arg_o(o, buffer_size, false);
+  BufferArg arg_x(xid, buffer_size, true);
+  BufferArg arg_y(yid, buffer_size, true);
+  BufferArg arg_o(oid, buffer_size, false);
   ValueArg<float> arg_n(n, sizeof(float), true);
 
   std::vector<Arg *> args {&arg_a, &arg_x, &arg_y, &arg_o, &arg_n};
@@ -54,8 +63,8 @@ void test_arg_parser() {
     exit(1);
   }
 
-  std::cout << "Parsed arguments from string kernel [" << kernel_path << "]: \n";
-  print_args(parsed_args);
+  //std::cout << "Parsed arguments from string kernel [" << kernel_path << "]: \n";
+  //print_args(parsed_args);
 
   // Get ptx and kernel handle
   CudaCompiler cuda_compiler;
@@ -103,8 +112,17 @@ void manager_launch_kernel_test() {
   // Setup input and output buffers
   size_t n = NUM_THREADS * NUM_BLOCKS;
   size_t buffer_size = n * sizeof(float);
+
+  // Allocate and write buffers
+  float *x, *y, *o;
+  int xid = cuda_manager.memory_manager.allocate_buffer(buffer_size, (void **) &x);
+  int yid = cuda_manager.memory_manager.allocate_buffer(buffer_size, (void **) &y);
+  int oid = cuda_manager.memory_manager.allocate_buffer(buffer_size, (void **) &o);
+  printf("Allocated buffer x id: %d\n", xid);
+  printf("Allocated buffer y id: %d\n", yid);
+  printf("Allocated buffer o id: %d\n", oid);
+
   float a = 2.5f;
-  float *x = new float[n], *y = new float[n], *o = new float[n];
   
   for (size_t i = 0; i < n; ++i) {
     x[i] = static_cast<float>(i);
@@ -112,10 +130,10 @@ void manager_launch_kernel_test() {
   }
 
   ValueArg<float>  arg_a(a, sizeof(float), true);
-  BufferArg arg_x(x, buffer_size, true);
-  BufferArg arg_y(y, buffer_size, true);
-  BufferArg arg_o(o, buffer_size, false);
-  ValueArg<size_t> arg_n(n, sizeof(size_t), true);
+  BufferArg arg_x(xid, buffer_size, true);
+  BufferArg arg_y(yid, buffer_size, true);
+  BufferArg arg_o(oid, buffer_size, false);
+  ValueArg<float> arg_n(n, sizeof(float), true);
 
   std::vector<Arg *> args {&arg_a, &arg_x, &arg_y, &arg_o, &arg_n};
 
@@ -203,7 +221,7 @@ void manual_launch_kernel_test() {
 }
 
 int main(void) {
-  // test_arg_parser();
-  manager_launch_kernel_test();
+  test_arg_parser();
+  //manager_launch_kernel_test();
   //manual_launch_kernel_test();
 }

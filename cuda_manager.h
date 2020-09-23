@@ -1,4 +1,5 @@
 #include "cuda_common.h"
+#include "cuda_memory_manager.h"
 #include <cuda.h>
 #include <vector>
 
@@ -17,6 +18,8 @@ public:
   CudaManager();
   ~CudaManager();
   void launch_kernel(const CUfunction kernel, const std::vector<Arg *> args, const uint32_t num_blocks, const uint32_t num_threads);
+
+  CudaMemoryManager memory_manager;
 
   uint32_t device_count = 0;
   // (Device, Context) pairs

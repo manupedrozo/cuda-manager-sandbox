@@ -1,6 +1,6 @@
 #include "server.h"
 #include "commands.h"
-#include "cuda_memory_manager.h"
+#include "cuda_manager.h"
 
 namespace cuda_mango {
 
@@ -9,15 +9,11 @@ private:
     Server server;
 
 public:
-
-    //Adding memory manager here for now, we have to decide its owner later
-    CudaMemoryManager memory_manager;
+    CudaManager cuda_manager;
 
     CudaServer(const char *socket_path);
     ~CudaServer();
 };
-
-
 
 
 }

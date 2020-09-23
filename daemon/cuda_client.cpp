@@ -27,7 +27,7 @@ namespace cuda_mango {
     }
 
 
-    CudaClient::ExitCode CudaClient::memory_allocate(size_t size, int &mem_id) { 
+    CudaClient::ExitCode CudaClient::memory_allocate(size_t size, int *mem_id) { 
         CHECK_OPEN_SOCKET
 
         memory_allocate_command_t cmd;
@@ -41,7 +41,7 @@ namespace cuda_mango {
             return ERROR;
         }
 
-        mem_id = res.mem_id;
+        *mem_id = res.mem_id;
 
         return OK;
     }

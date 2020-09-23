@@ -12,7 +12,7 @@ Server::message_result_t handle_memory_allocate_command(int id, const memory_all
 
     printf("Received: memory allocate command\n");
 
-    int mem_id = cuda_server->memory_manager.allocate_buffer(cmd->size);
+    int mem_id = cuda_server->cuda_manager.memory_manager.allocate_buffer(cmd->size);
 
     memory_allocate_success_command_t *res = (memory_allocate_success_command_t *) malloc(sizeof(memory_allocate_success_command_t));
     init_memory_allocate_success_command(*res, mem_id);
@@ -60,10 +60,10 @@ void handle_data(int id, Server::packet_t packet, Server &server, CudaServer *cu
 
 CudaServer::CudaServer(const char *socket_path) : 
         server(socket_path, 10,
-                [&](int id, Server::message_t msg, Server &server) { return handle_command(id, msg, server, this); },
-                [&](int id, Server::packet_t packet, Server &server) { return handle_data(id, packet, server, this); }
+            [&](int id, Server::message_t msg, Server &server) { return handle_command(id, msg, server, this); },
+            [&](int id, Server::packet_t packet, Server &server) { return handle_data(id, packet, server, this); }
           ), 
-        memory_manager() {
+        cuda_manager() {
 
     printf("starting\n");
     this->server.initialize();

@@ -1,8 +1,8 @@
 #ifndef CUDA_COMMON
 #define CUDA_COMMON
 
-//#include <nvrtc.h>
-//#include <cuda.h>
+#include <nvrtc.h>
+#include <cuda.h>
 #include <iostream>
 
 #define CUDA_SAFE_CALL(x)                                         \
@@ -41,6 +41,7 @@ class Arg {
   }
 
   virtual void *get_value_ptr() { return nullptr; }
+  virtual int get_id() { return -1; }
 };
 
 template <class T>
@@ -59,15 +60,15 @@ class ValueArg : public Arg {
 
 class BufferArg : public Arg {
   public:
-    void *value;
+    int id;
 
-    BufferArg(void *value, size_t size, bool is_in): Arg(size, true, is_in) {
-      this->value = value;
-    }
+  BufferArg(int id, size_t size, bool is_in): Arg(size, true, is_in) {
+    this->id = id;
+  }
 
-    virtual void *get_value_ptr() {
-      return value;
-    }
+  virtual int get_id() {
+    return id;
+  }
 };
 
 #endif
