@@ -69,6 +69,8 @@ namespace cuda_mango {
 
         TRY_OR_CLOSE(send_on_socket(socket_fd, buf, size))
 
+        TRY_OR_CLOSE(receive_on_socket(socket_fd, &res, sizeof(res)))
+
         return OK;
     }
 

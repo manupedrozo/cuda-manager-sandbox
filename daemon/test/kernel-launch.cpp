@@ -59,5 +59,10 @@ int main(int argc, char const *argv[]) {
   // Launch kernel
   client.launch_kernel(arguments, arg_size);
 
+  client.memory_read(oid, (void *) o, buffer_size);
+
+  for (size_t i = 0; i < 10; ++i) { // first 10 results only
+    std::cout << a << " * " << x[i] << " + " << y[i] << " = " << o[i] << '\n';
+  }
 
 }

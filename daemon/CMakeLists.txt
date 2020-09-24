@@ -11,8 +11,8 @@ set(CLIENT_1_SRC socket_client.cpp test/client-hello.cpp)
 set(CLIENT_2_SRC socket_client.cpp test/client-continous.cpp)
 set(CLIENT_3_SRC socket_client.cpp test/client-variable-length.cpp)
 set(CLIENT_4_SRC socket_client.cpp test/client-multimessage.cpp)
-set(CLIENT_5_SRC cuda_client.cpp server.cpp socket_client.cpp cuda_server.cpp logger.cpp test/kernel-launch.cpp)
-set(CUDA_SERVER cuda_client.cpp server.cpp socket_client.cpp cuda_server.cpp logger.cpp test/cuda-server.cpp)
+set(CLIENT_5_SRC cuda_client.cpp server.cpp socket_client.cpp cuda_server.cpp config_reader.cpp logger.cpp test/kernel-launch.cpp)
+set(CUDA_SERVER cuda_client.cpp server.cpp socket_client.cpp cuda_server.cpp config_reader.cpp logger.cpp test/cuda-server.cpp)
 set(KILLER_SRC test/killer.cpp)
 
 set(COMMON_HEADERS commands.h)
@@ -30,8 +30,8 @@ add_executable(cuda-server ${CUDA_SERVER})
 add_executable(killer ${KILLER_SRC})
 
 target_link_libraries(server PRIVATE spdlog::spdlog)
-target_link_libraries(cuda-server PRIVATE ${CUDA_MANGO})
-target_link_libraries(kernel-launch PRIVATE ${CUDA_MANGO})
+target_link_libraries(cuda-server PRIVATE ${CUDA_MANGO} spdlog::spdlog)
+target_link_libraries(kernel-launch PRIVATE ${CUDA_MANGO} spdlog::spdlog)
 
 ## THIS IS TEMPORARY, SHOULD BE DELETED AFTER KERNEL LAUNCH CLEANUP
 find_library(CUDA_LIBRARY cuda ${CMAKE_CUDA_IMPLICIT_LINK_DIRECTORIES})

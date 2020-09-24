@@ -43,4 +43,10 @@ void CudaMemoryManager::write_buffer(int id, void *data, size_t size) {
   memcpy(buffer.ptr, data, size);
 }
 
+void CudaMemoryManager::read_buffer(int id, void *buf, size_t size) {
+  MemoryBuffer buffer = get_buffer(id);
 
+  assert(size <= buffer.size && "Read size is greater than buffer size");
+
+  memcpy(buf, buffer.ptr, size);
+}

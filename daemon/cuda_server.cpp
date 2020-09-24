@@ -31,6 +31,20 @@ namespace cuda_mango {
     return {Server::MessageListenerExitCode::OK, sizeof(memory_write_command_t), cmd->size};
   }
 
+  Server::message_result_t handle_memory_read_command(int id, const memory_read_command_t *cmd, Server &server, CudaServer *cuda_server) {
+    printf("Received: memory read command\n");
+
+    void *buffer = malloc(cmd->size);
+    cuda_server->cuda_manager.memory_manager.read_buffer(cmd->mem_id, buffer, cmd->size);
+
+    for (size_t i = 0; i < 10; ++i) { // first 10 results only
+      std::cout << i << " = " << ((float *)buffer)[i] << '\n';
+    }
+
+    server.send_on_socket(id, {buffer, cmd->size});
+    return {Server::MessageListenerExitCode::OK, sizeof(memory_read_command_t), 0};
+  }
+
   Server::message_result_t handle_launch_kernel_command(int id, const launch_kernel_command_t *cmd, Server &server) {
     printf("Received: launch kernel command\n");
     server.send_on_socket(id, {create_ack(), sizeof(command_base_t)});
@@ -59,6 +73,11 @@ namespace cuda_mango {
           return handle_memory_write_command(id, (memory_write_command_t *)  msg.buf, server, cuda_server);
         }
         break;
+      case MEM_READ:
+        if (msg.size >= sizeof(memory_read_command_t)) {
+          return handle_memory_read_command(id, (memory_read_command_t *)  msg.buf, server, cuda_server);
+        }
+        break;
       case LAUNCH_KERNEL:
         if (msg.size >= sizeof(launch_kernel_command_t)) {
           return handle_launch_kernel_command(id, (launch_kernel_command_t *)  msg.buf, server);
@@ -85,16 +104,12 @@ namespace cuda_mango {
       case MEM_WRITE: {
         memory_write_command_t *command = (memory_write_command_t *) base;
 
-        assert(command->size == packet.extra_data.size && "Expected data size doesn't match actual size");
-
         cuda_server->cuda_manager.memory_manager.write_buffer(command->mem_id, packet.extra_data.buf, command->size);
         break;
       }
       case LAUNCH_KERNEL: {
         launch_kernel_command_t *command = (launch_kernel_command_t *) base;
         
-        assert(command->size == packet.extra_data.size && "Expected data size doesn't match actual size");
-
         std::vector<Arg *> parsed_args;
         char *kernel_path;
         bool err = parse_arguments((char *) packet.extra_data.buf, parsed_args, &kernel_path);

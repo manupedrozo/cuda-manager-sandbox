@@ -24,4 +24,5 @@ public:
   void deallocate_buffer(int id);
   MemoryBuffer get_buffer(int id);
   void write_buffer(int id, void *data, size_t size);
+  void read_buffer(int id, void *buf, size_t size);
 };
