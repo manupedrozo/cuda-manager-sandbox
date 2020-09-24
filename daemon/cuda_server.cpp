@@ -36,11 +36,6 @@ namespace cuda_mango {
 
     void *buffer = malloc(cmd->size);
     cuda_server->cuda_manager.memory_manager.read_buffer(cmd->mem_id, buffer, cmd->size);
-
-    for (size_t i = 0; i < 10; ++i) { // first 10 results only
-      std::cout << i << " = " << ((float *)buffer)[i] << '\n';
-    }
-
     server.send_on_socket(id, {buffer, cmd->size});
     return {Server::MessageListenerExitCode::OK, sizeof(memory_read_command_t), 0};
   }

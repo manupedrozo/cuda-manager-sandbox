@@ -5,7 +5,6 @@
 #include <sys/un.h>
 #include <string.h>
 #include <errno.h>
-#include <iostream>
 
 #include "server.h"
 #include "logger.h"
@@ -302,12 +301,6 @@ Server::Socket::SendMessagesExitCode Server::Socket::send_messages() {
             size_t bytes_to_send = sending_message.msg.size - sending_message.byte_offset;
             ssize_t bytes_sent = send(fd, (char *) sending_message.msg.buf + sending_message.byte_offset, bytes_to_send, MSG_NOSIGNAL | MSG_DONTWAIT);
             logger.debug("send: OFFSET {}", sending_message.byte_offset);
-
-            for (size_t i = 0; i < 10; ++i) { // first 10 results only
-              std::cout << i << " = " << ((float *)sending_message.msg.buf)[i] << '\n';
-            }
-
-
             if(bytes_sent == 0 || (bytes_sent < 0 && (errno == EAGAIN || errno == EWOULDBLOCK))) {
                 logger.debug("send: Can't send data right now, trying later");
                 break;
