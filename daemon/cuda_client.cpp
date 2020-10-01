@@ -1,6 +1,7 @@
 #include "commands.h"
 #include "socket_client.h"
 #include "cuda_client.h"
+#include <stdio.h> 
 
 #define CHECK_OPEN_SOCKET if(socket_fd == -1) return SEVERE_ERROR;
 #define TRY_OR_CLOSE(x)         \
@@ -13,6 +14,10 @@ namespace cuda_mango {
 
     CudaClient::CudaClient(const char *socket_path) {
         socket_fd = initialize(socket_path);
+        if(socket_fd == -1) {
+          printf("CudaClient: Socket initialization failure\n");
+          exit(EXIT_FAILURE);
+        }
     }
 
     CudaClient::~CudaClient() {

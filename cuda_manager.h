@@ -15,14 +15,20 @@ struct CudaBuffer {
  */
 class CudaManager {
 public:
-  CudaManager();
-  ~CudaManager();
-  void launch_kernel(const CUfunction kernel, const std::vector<Arg *> args, const uint32_t num_blocks, const uint32_t num_threads);
-
   CudaMemoryManager memory_manager;
 
   uint32_t device_count = 0;
   // (Device, Context) pairs
   CUdevice *devices; 
   CUcontext *contexts;
+
+
+  CudaManager();
+  ~CudaManager();
+  
+  // Load kernel from a ptx and function name
+  void launch_kernel_from_ptx(const char *ptx, const char* function_name, const std::vector<Arg *> args, const uint32_t num_blocks, const uint32_t num_threads);
+
+  // Careful! this function will launch a kernel in the current context, if you are not manually managing contexts, do not use this function directly
+  void launch_kernel(const CUfunction kernel, const std::vector<Arg *> args, const uint32_t num_blocks, const uint32_t num_threads); 
 };

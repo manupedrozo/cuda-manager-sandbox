@@ -65,4 +65,8 @@ int main(int argc, char const *argv[]) {
     std::cout << a << " * " << x[i] << " + " << y[i] << " = " << o[i] << '\n';
   }
 
+  delete[] x;
+  delete[] y;
+  delete[] o;
+
 }

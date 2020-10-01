@@ -38,10 +38,26 @@ CudaManager::~CudaManager() {
   }
 }
 
-void CudaManager::launch_kernel(const CUfunction kernel, const std::vector<Arg *> args, const uint32_t num_blocks, const uint32_t num_threads) {
-  // Set context where to launch the kernel
-  CUDA_SAFE_CALL(cuCtxSetCurrent(contexts[0])); // TODO move this
 
+void CudaManager::launch_kernel_from_ptx(const char *ptx, const char* function_name, const std::vector<Arg *> args, const uint32_t num_blocks, const uint32_t num_threads) {
+  // Set context where to launch the kernel
+  CUDA_SAFE_CALL(cuCtxSetCurrent(contexts[0])); // TODO just using one context for now
+
+  // Load module in current context and get kernel handle
+  CUfunction kernel;
+  CUmodule module;
+  CUDA_SAFE_CALL(cuModuleLoadDataEx(&module, ptx, 0, 0, 0));
+  CUDA_SAFE_CALL(cuModuleGetFunction(&kernel, module, function_name));
+
+  // Launch kernel in current context
+  launch_kernel(kernel, args, num_blocks, num_threads);
+
+  // Unload module
+  CUDA_SAFE_CALL(cuModuleUnload(module));
+}
+
+
+void CudaManager::launch_kernel(const CUfunction kernel, const std::vector<Arg *> args, const uint32_t num_blocks, const uint32_t num_threads) {
   void *kernel_args[args.size()]; // Args to be passed on kernel launch
   std::vector<CudaBuffer> buffers; // Keep track of buffers 
 

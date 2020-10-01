@@ -1,9 +1,12 @@
 #include "cuda_server.h"
 #include "cuda_argument_parser.h"
+#include "logger.h"
 #include <assert.h>
 #include <vector>
 
 namespace cuda_mango {
+
+  static Logger &logger = Logger::get_instance();
 
   command_base_t *create_ack() {
     command_base_t *response = (command_base_t *) malloc(sizeof(command_base_t));
@@ -13,7 +16,7 @@ namespace cuda_mango {
 
   Server::message_result_t handle_memory_allocate_command(int id, const memory_allocate_command_t *cmd, Server &server, CudaServer *cuda_server) {
 
-    printf("Received: memory allocate command\n");
+    logger.info("Received: memory allocate command");
 
     int mem_id = cuda_server->cuda_manager.memory_manager.allocate_buffer(cmd->size);
 
@@ -25,14 +28,14 @@ namespace cuda_mango {
   }
 
   Server::message_result_t handle_memory_write_command(int id, const memory_write_command_t *cmd, Server &server, CudaServer *cuda_server) {
-    printf("Received: memory write command\n");
+    logger.info("Received: memory write command");
 
     server.send_on_socket(id, {create_ack(), sizeof(command_base_t)});
     return {Server::MessageListenerExitCode::OK, sizeof(memory_write_command_t), cmd->size};
   }
 
   Server::message_result_t handle_memory_read_command(int id, const memory_read_command_t *cmd, Server &server, CudaServer *cuda_server) {
-    printf("Received: memory read command\n");
+    logger.info("Received: memory read command");
 
     void *buffer = malloc(cmd->size);
     cuda_server->cuda_manager.memory_manager.read_buffer(cmd->mem_id, buffer, cmd->size);
@@ -41,7 +44,7 @@ namespace cuda_mango {
   }
 
   Server::message_result_t handle_launch_kernel_command(int id, const launch_kernel_command_t *cmd, Server &server) {
-    printf("Received: launch kernel command\n");
+    logger.info("Received: launch kernel command");
     server.send_on_socket(id, {create_ack(), sizeof(command_base_t)});
     return {Server::MessageListenerExitCode::OK, sizeof(launch_kernel_command_t), cmd->size};
   }
@@ -52,7 +55,7 @@ namespace cuda_mango {
   }
 
   Server::message_result_t handle_command(int id, Server::message_t msg, Server &server, CudaServer *cuda_server) {
-    printf("Handling command\n");
+    logger.info("Handling command");
     if (msg.size < sizeof(command_base_t)) {
       return {Server::MessageListenerExitCode::INSUFFICIENT_DATA, 0, 0}; // Need to read more data to determine a command
     }
@@ -84,7 +87,7 @@ namespace cuda_mango {
         }
         break;
       default:
-        printf("handle: Unknown command\n");
+        logger.info("Received: unknown command");
         return {Server::MessageListenerExitCode::UNKNOWN_MESSAGE, 0, 0};
         break;
     }
@@ -92,7 +95,7 @@ namespace cuda_mango {
   }
 
   void handle_data(int id, Server::packet_t packet, Server &server, CudaServer *cuda_server) {
-    printf("Received data, size: %zu\n", packet.extra_data.size);
+    logger.info("Received data, size: {}", packet.extra_data.size);
 
     command_base_t *base = (command_base_t *) packet.msg.buf;
     switch (base->cmd) {
@@ -109,33 +112,25 @@ namespace cuda_mango {
         char *kernel_path;
         bool err = parse_arguments((char *) packet.extra_data.buf, parsed_args, &kernel_path);
 
-        // @TODO there is data error handling in the server yet
+        // @TODO there is no data error handling in the server yet
         assert(err && "Argument parsing error");
 
-        // @TODO this needs a clean up, we are doing all the work here now for simplicity
-        // We probably wont have the compiler here
-        // We are assuming that the kernel ptx file is accessible by path
+        // @TODO We are assuming that the kernel ptx file is accessible by path and that the kernel_path is the same as function name inside the ptx file
         char *ptx = cuda_server->cuda_compiler.read_ptx_from_file(kernel_path);
 
-        CUmodule module;
-        CUfunction kernel;
-        CUDA_SAFE_CALL(cuModuleLoadDataEx(&module, ptx, 0, 0, 0));
-        CUDA_SAFE_CALL(cuModuleGetFunction(&kernel, module, kernel_path));
+        cuda_server->cuda_manager.launch_kernel_from_ptx(ptx, kernel_path, parsed_args, 32, 128);
 
+        // Free stuff
         delete[] kernel_path;
         delete[] ptx;
-
-        cuda_server->cuda_manager.launch_kernel(kernel, parsed_args, 32, 128);
-
         for (Arg *arg : parsed_args) { free(arg); }
-        CUDA_SAFE_CALL(cuModuleUnload(module));
 
-        printf("Kernel launch completed\n");
+        logger.info("Kernel launch completed");
 
         break;
       }
       default: {
-        printf("Content:\n%.*s\n", (int) packet.extra_data.size, (char*) packet.extra_data.buf);
+        logger.info("Data from unsupported command: {}", (char*) packet.extra_data.buf);
         break;
       }
     }
@@ -153,8 +148,12 @@ namespace cuda_mango {
     cuda_manager(),
     cuda_compiler() {
 
-      printf("starting\n");
-      this->server.initialize();
+      logger.info("Cuda server starting...");
+      Server::InitExitCode err = this->server.initialize();
+      if (err != Server::InitExitCode::OK) {
+        logger.error("Cuda server initialization error");
+        exit(EXIT_FAILURE);
+      }
       this->server.start();
     }
 

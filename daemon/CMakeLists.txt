@@ -33,22 +33,13 @@ target_link_libraries(server PRIVATE spdlog::spdlog)
 target_link_libraries(cuda-server PRIVATE ${CUDA_MANGO} spdlog::spdlog)
 target_link_libraries(kernel-launch PRIVATE ${CUDA_MANGO} spdlog::spdlog)
 
-## THIS IS TEMPORARY, SHOULD BE DELETED AFTER KERNEL LAUNCH CLEANUP
-find_library(CUDA_LIBRARY cuda ${CMAKE_CUDA_IMPLICIT_LINK_DIRECTORIES})
-find_library(NVRTC_LIBRARY nvrtc ${CMAKE_CUDA_IMPLICIT_LINK_DIRECTORIES})
-target_link_libraries(cuda-server PRIVATE ${CUDA_LIBRARY} ${NVRTC_LIBRARY})
-target_link_libraries(kernel-launch PRIVATE ${CUDA_LIBRARY} ${NVRTC_LIBRARY})
-target_include_directories(kernel-launch PRIVATE ${MANGO_ROOT}/include/libcuda_mango/cuda_mango ${PROJECT_SOURCE_DIR} ${PROJECT_SOURCE_DIR}/external ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
-target_include_directories(cuda-server PRIVATE ${MANGO_ROOT}/include/libcuda_mango/cuda_mango ${PROJECT_SOURCE_DIR} ${PROJECT_SOURCE_DIR}/external ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
-###
-
 target_include_directories(server PRIVATE ${PROJECT_SOURCE_DIR} ${PROJECT_SOURCE_DIR}/external)
 target_include_directories(client PRIVATE ${PROJECT_SOURCE_DIR} ${PROJECT_SOURCE_DIR}/external)
 target_include_directories(client-continous PRIVATE ${PROJECT_SOURCE_DIR} ${PROJECT_SOURCE_DIR}/external)
 target_include_directories(client-variable-length PRIVATE ${PROJECT_SOURCE_DIR} ${PROJECT_SOURCE_DIR}/external)
 target_include_directories(client-multimessage PRIVATE ${PROJECT_SOURCE_DIR} ${PROJECT_SOURCE_DIR}/external)
-#target_include_directories(kernel-launch PRIVATE ${MANGO_ROOT}/include/libcuda_mango/cuda_mango ${PROJECT_SOURCE_DIR} ${PROJECT_SOURCE_DIR}/external)
-#target_include_directories(cuda-server PRIVATE ${MANGO_ROOT}/include/libcuda_mango/cuda_mango ${PROJECT_SOURCE_DIR} ${PROJECT_SOURCE_DIR}/external)
+target_include_directories(kernel-launch PRIVATE ${MANGO_ROOT}/include/libcuda_mango/cuda_mango ${PROJECT_SOURCE_DIR} ${PROJECT_SOURCE_DIR}/external)
+target_include_directories(cuda-server PRIVATE ${MANGO_ROOT}/include/libcuda_mango/cuda_mango ${PROJECT_SOURCE_DIR} ${PROJECT_SOURCE_DIR}/external)
 target_include_directories(killer PRIVATE ${PROJECT_SOURCE_DIR} ${PROJECT_SOURCE_DIR}/external)
 
 configure_file(lorem.txt lorem.txt COPYONLY)
