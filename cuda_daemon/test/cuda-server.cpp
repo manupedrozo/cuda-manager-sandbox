@@ -5,7 +5,7 @@
 #define CONFIG_FILE "daemon.conf"
 
 
-using namespace cuda_mango;
+using namespace cuda_daemon;
 
 int main(int argc, char const *argv[]) { 
   daemon_config_t config;

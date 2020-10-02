@@ -24,10 +24,10 @@ int main(int argc, char const *argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    cuda_mango::command_base_t res;
+    cuda_daemon::command_base_t res;
 
-    cuda_mango::hello_command_t hello_cmd;
-    cuda_mango::init_hello_command(hello_cmd, "Hello from client");
+    cuda_daemon::hello_command_t hello_cmd;
+    cuda_daemon::init_hello_command(hello_cmd, "Hello from client");
 
     printf("Trying to send %d hello messages\n", MESSAGE_AMOUNT);
 
@@ -49,7 +49,7 @@ int main(int argc, char const *argv[]) {
             return EXIT_FAILURE;
         }
 
-        if (res.cmd == cuda_mango::ACK) {
+        if (res.cmd == cuda_daemon::ACK) {
             printf("Server ack received\n");
         } else {
             return EXIT_FAILURE;
@@ -61,8 +61,8 @@ int main(int argc, char const *argv[]) {
     auto file_stream = std::ifstream(TEST_FILE_PATH);
     auto lorem = slurp(file_stream);
 
-    cuda_mango::variable_length_command_t cmd;
-    cuda_mango::init_variable_length_command(cmd, lorem.size());
+    cuda_daemon::variable_length_command_t cmd;
+    cuda_daemon::init_variable_length_command(cmd, lorem.size());
 
     printf("File size %li\n", lorem.size());
 
@@ -80,7 +80,7 @@ int main(int argc, char const *argv[]) {
         return EXIT_FAILURE;
     }
 
-    if (res.cmd == cuda_mango::ACK) {
+    if (res.cmd == cuda_daemon::ACK) {
         printf("Server ack received\n");
     } else {
         return EXIT_FAILURE;
@@ -91,7 +91,7 @@ int main(int argc, char const *argv[]) {
         return EXIT_FAILURE;
     }
 
-    if (res.cmd == cuda_mango::ACK) {
+    if (res.cmd == cuda_daemon::ACK) {
         printf("Server ack received\n");
     } else {
         return EXIT_FAILURE;

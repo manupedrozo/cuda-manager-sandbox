@@ -4,6 +4,8 @@
 #include <vector>
 #include <iostream>
 
+namespace cuda_manager {
+
 CudaManager::CudaManager() : memory_manager() {
   std::cout << "Initializing CUDA Manager...\n";
   CUDA_SAFE_CALL(cuInit(0));
@@ -125,4 +127,6 @@ void CudaManager::launch_kernel(const CUfunction kernel, const std::vector<Arg *
     std::cout << "Deallocated " << cuda_buffer.d_ptr << "\n";
     CUDA_SAFE_CALL(cuMemFree(cuda_buffer.d_ptr));
   }
+}
+
 }

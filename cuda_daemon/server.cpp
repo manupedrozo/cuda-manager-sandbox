@@ -11,7 +11,7 @@
 
 #define NO_SOCKET -1
 
-namespace cuda_mango {
+namespace cuda_daemon {
 
 static Logger &logger = Logger::get_instance();
 
@@ -427,4 +427,4 @@ Server::Socket::ReceiveMessagesExitCode Server::Socket::consume_message_buffer()
     return ReceiveMessagesExitCode::OK;
 }
 
-} //namespace cuda_mango
+} //namespace cuda_daemon

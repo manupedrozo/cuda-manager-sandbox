@@ -3,6 +3,8 @@
 #include <cuda.h>
 #include <vector>
 
+namespace cuda_manager {
+
 // Struct to keep track of buffers
 struct CudaBuffer {
   void *h_ptr; // Ptr to host memory
@@ -32,3 +34,5 @@ public:
   // Careful! this function will launch a kernel in the current context, if you are not manually managing contexts, do not use this function directly
   void launch_kernel(const CUfunction kernel, const std::vector<Arg *> args, const uint32_t num_blocks, const uint32_t num_threads); 
 };
+
+}

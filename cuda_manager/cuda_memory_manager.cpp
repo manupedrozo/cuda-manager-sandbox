@@ -2,6 +2,8 @@
 #include <assert.h>
 #include <map>
 
+namespace cuda_manager {
+
 int CudaMemoryManager::allocate_buffer(size_t size, void **result_ptr) {
   assert(size > 0 && "Memory to allocate is 0 or less");
   void *ptr = malloc(size);
@@ -49,4 +51,6 @@ void CudaMemoryManager::read_buffer(int id, void *buf, size_t size) {
   assert(size <= buffer.size && "Read size is greater than buffer size");
 
   memcpy(buf, buffer.ptr, size);
+}
+
 }

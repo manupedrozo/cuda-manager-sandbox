@@ -5,6 +5,8 @@
 #include <sstream>
 #include <string.h>
 
+namespace cuda_manager {
+
 std::string parse_next(int *position, const char *arguments, bool *is_number) {
   int i = *position;
 
@@ -193,4 +195,6 @@ void print_args(std::vector<Arg *> args) {
   for (Arg *arg: args) {
     std::cout << ++i << ") is_buffer = " << arg->is_buffer << " value = " << arg->get_value_ptr() << " size = " << arg->size << " ptr = " << arg->get_value_ptr() << " is_in = " << arg->is_in << '\n';
   }
+}
+
 }

@@ -10,7 +10,7 @@
         return SEVERE_ERROR;    \
     }
 
-namespace cuda_mango {
+namespace cuda_daemon {
 
     CudaClient::CudaClient(const char *socket_path) {
         socket_fd = initialize(socket_path);

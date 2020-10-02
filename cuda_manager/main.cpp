@@ -17,6 +17,8 @@ const char *KERNEL_FILENAME = "saxpy.cu";
 const char *KERNEL_PATH     = "saxpy.cu";
 const char *PTX_PATH        = "saxpy";
 
+using namespace cuda_manager;
+
 // Requires compiled ptx
 void test_arg_parser() {
   CudaManager cuda_manager;

@@ -4,7 +4,7 @@
 #include <assert.h>
 #include <vector>
 
-namespace cuda_mango {
+namespace cuda_daemon {
 
   static Logger &logger = Logger::get_instance();
 
@@ -108,9 +108,9 @@ namespace cuda_mango {
       case LAUNCH_KERNEL: {
         launch_kernel_command_t *command = (launch_kernel_command_t *) base;
         
-        std::vector<Arg *> parsed_args;
+        std::vector<cuda_manager::Arg *> parsed_args;
         char *kernel_path;
-        bool err = parse_arguments((char *) packet.extra_data.buf, parsed_args, &kernel_path);
+        bool err = cuda_manager::parse_arguments((char *) packet.extra_data.buf, parsed_args, &kernel_path);
 
         // @TODO there is no data error handling in the server yet
         assert(err && "Argument parsing error");
@@ -123,7 +123,7 @@ namespace cuda_mango {
         // Free stuff
         delete[] kernel_path;
         delete[] ptx;
-        for (Arg *arg : parsed_args) { free(arg); }
+        for (cuda_manager::Arg *arg : parsed_args) { free(arg); }
 
         logger.info("Kernel launch completed");
 

@@ -2,6 +2,7 @@
 #include <vector>
 #include <string>
 
+namespace cuda_manager {
 
 /*! \brief Parse arguments from a string.
  * The following syntax is required: {kernel_path arguments}
@@ -16,3 +17,5 @@ bool parse_arguments(const char *arguments, std::vector<Arg *> &args, char **ker
 
 std::string args_to_string(std::string kernel_path, std::vector<Arg *> args);
 void print_args(std::vector<Arg *> args);
+
+}

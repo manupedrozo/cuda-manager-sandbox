@@ -5,7 +5,7 @@
 
 #include "spdlog/spdlog.h"
 
-namespace cuda_mango {
+namespace cuda_daemon {
     class Logger {
 
         public:

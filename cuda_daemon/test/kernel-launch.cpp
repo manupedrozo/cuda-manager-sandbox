@@ -11,7 +11,8 @@
 #define SOCKET_PATH "/tmp/server-test"
 const char *KERNEL_NAME = "saxpy";
 
-using namespace cuda_mango;
+using namespace cuda_daemon;
+using namespace cuda_manager;
 
 int main(int argc, char const *argv[]) { 
 

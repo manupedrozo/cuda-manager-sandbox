@@ -3,6 +3,8 @@
 #include <fstream>
 #include <iostream>
 
+namespace cuda_manager {
+
 char *CudaCompiler::compile_to_ptx(const char *source_path) {
   std::cout << "Compiling cuda kernel file [" << source_path << "]...\n";
   // Read kernel file
@@ -91,4 +93,6 @@ char *CudaCompiler::read_ptx_from_file(const char *ptx_path) {
   input_file.close();
 
   return ptx;
+}
+
 }

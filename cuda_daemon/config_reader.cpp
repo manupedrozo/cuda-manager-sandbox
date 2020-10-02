@@ -1,7 +1,7 @@
 #include "inih/INIReader.h"
 #include "config_reader.h"
 
-namespace cuda_mango {
+namespace cuda_daemon {
     ConfigReader::ExitCode ConfigReader::read_config(std::string path, daemon_config_t &config) {
         auto reader = INIReader(path);
 

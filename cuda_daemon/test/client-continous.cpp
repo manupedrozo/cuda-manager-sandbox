@@ -20,10 +20,10 @@ int main(int argc, char const *argv[]) {
         std::cin >> msg_buf;
 
         printf("Message: %s\n", msg_buf);
-        cuda_mango::hello_command_t hello_cmd;
-        cuda_mango::init_hello_command(hello_cmd, msg_buf);
+        cuda_daemon::hello_command_t hello_cmd;
+        cuda_daemon::init_hello_command(hello_cmd, msg_buf);
 
-        cuda_mango::command_base_t res;
+        cuda_daemon::command_base_t res;
 
         if(!send_on_socket(sock, &hello_cmd, sizeof(hello_cmd))) {
             return EXIT_FAILURE;

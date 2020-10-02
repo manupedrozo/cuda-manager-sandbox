@@ -1,7 +1,7 @@
 #include "logger.h"
 #include "spdlog/sinks/stdout_color_sinks.h"
 
-namespace cuda_mango {
+namespace cuda_daemon {
     spdlog::level::level_enum Logger::level = spdlog::level::info;
 
     Logger::Logger() {

@@ -6,29 +6,29 @@
 
 #define CONFIG_FILE "daemon.conf"
 
-using namespace cuda_mango;
+using namespace cuda_daemon;
 
-cuda_mango::command_base_t *create_ack() {
-    cuda_mango::command_base_t *response = (cuda_mango::command_base_t *) malloc(sizeof(cuda_mango::command_base_t));
-    cuda_mango::init_ack_command(*response);
+cuda_daemon::command_base_t *create_ack() {
+    cuda_daemon::command_base_t *response = (cuda_daemon::command_base_t *) malloc(sizeof(cuda_daemon::command_base_t));
+    cuda_daemon::init_ack_command(*response);
     return response;
 }
 
 Server::message_result_t handle_hello_command(int id, const hello_command_t *cmd, Server &server) {
     printf("%s\n", cmd->message);
-    server.send_on_socket(id, {create_ack(), sizeof(cuda_mango::command_base_t)});
+    server.send_on_socket(id, {create_ack(), sizeof(cuda_daemon::command_base_t)});
     return {Server::MessageListenerExitCode::OK, sizeof(hello_command_t), 0};
 }
 
 Server::message_result_t handle_end_command(int id, const command_base_t *cmd, Server &server) {
     (void) (cmd);
-    server.send_on_socket(id, {create_ack(), sizeof(cuda_mango::command_base_t)});
+    server.send_on_socket(id, {create_ack(), sizeof(cuda_daemon::command_base_t)});
     server.stop();
     return {Server::MessageListenerExitCode::OK, sizeof(command_base_t), 0};
 }
 
 Server::message_result_t handle_variable_length_command(int id, const variable_length_command_t *cmd, Server &server) {
-    server.send_on_socket(id, {create_ack(), sizeof(cuda_mango::command_base_t)});
+    server.send_on_socket(id, {create_ack(), sizeof(cuda_daemon::command_base_t)});
     return {Server::MessageListenerExitCode::OK, sizeof(variable_length_command_t), cmd->size}; // Ask to start reading size amount of bytes as plain data and return it via the data_listener
 }
 
@@ -68,7 +68,7 @@ void data_listener(int id, Server::packet_t packet, Server &server) {
     printf("Content:\n%.*s\n", (int) packet.extra_data.size, (char*) packet.extra_data.buf);
     free(packet.extra_data.buf);
     free(packet.msg.buf);
-    server.send_on_socket(id, {create_ack(), sizeof(cuda_mango::command_base_t)});
+    server.send_on_socket(id, {create_ack(), sizeof(cuda_daemon::command_base_t)});
 }
 
 int main(int argc, char const *argv[]) { 

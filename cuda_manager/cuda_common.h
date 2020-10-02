@@ -27,6 +27,7 @@
     }                                                             \
   } while(0)
 
+namespace cuda_manager {
 
 class Arg {
   public:
@@ -71,4 +72,7 @@ class BufferArg : public Arg {
   }
 };
 
+}
+
 #endif
+

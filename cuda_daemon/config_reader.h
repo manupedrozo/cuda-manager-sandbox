@@ -1,7 +1,7 @@
 #include <string>
 #include "logger.h"
 
-namespace cuda_mango {
+namespace cuda_daemon {
 
     typedef struct {
         Logger::Level log_level;

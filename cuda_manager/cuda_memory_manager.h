@@ -1,8 +1,10 @@
 #include <map>
 #include <string.h>
 
-// @TODO Properly handle errors, e.g when buffer doesnt exist
 
+namespace cuda_manager {
+
+// @TODO Properly handle errors, e.g when buffer doesnt exist
 struct MemoryBuffer {
   int id;
   size_t size;
@@ -26,3 +28,5 @@ public:
   void write_buffer(int id, void *data, size_t size);
   void read_buffer(int id, void *buf, size_t size);
 };
+
+}

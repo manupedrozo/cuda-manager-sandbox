@@ -8,7 +8,7 @@
 #include <poll.h>
 #include <memory>
 
-namespace cuda_mango {
+namespace cuda_daemon {
     
 class Server {
 
@@ -179,6 +179,6 @@ class Server {
         void close_socket(int fd_idx);
 };
 
-} // namespace cuda_mango
+} // namespace cuda_daemon
 
 #endif

@@ -28,10 +28,10 @@ int main(int argc, char const *argv[]) {
 
     printf("%s\n", lorem.c_str());
 
-    cuda_mango::variable_length_command_t cmd;
-    cuda_mango::init_variable_length_command(cmd, lorem.size());
+    cuda_daemon::variable_length_command_t cmd;
+    cuda_daemon::init_variable_length_command(cmd, lorem.size());
 
-    cuda_mango::command_base_t res;
+    cuda_daemon::command_base_t res;
 
     if(!send_on_socket(sock, &cmd, sizeof(cmd))) {
         return EXIT_FAILURE;
@@ -43,7 +43,7 @@ int main(int argc, char const *argv[]) {
         return EXIT_FAILURE;
     }
 
-    if (res.cmd == cuda_mango::ACK) {
+    if (res.cmd == cuda_daemon::ACK) {
         printf("Server ack received\n");
     } else {
         return EXIT_FAILURE;
@@ -59,7 +59,7 @@ int main(int argc, char const *argv[]) {
         return EXIT_FAILURE;
     }
 
-    if (res.cmd == cuda_mango::ACK) {
+    if (res.cmd == cuda_daemon::ACK) {
             printf("Server ack received\n");
     } else {
         return EXIT_FAILURE;

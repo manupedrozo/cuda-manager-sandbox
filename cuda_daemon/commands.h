@@ -3,7 +3,7 @@
 
 #include <string.h>
 
-namespace cuda_mango {
+namespace cuda_daemon {
     enum command_type {
         HELLO,
         VARIABLE,

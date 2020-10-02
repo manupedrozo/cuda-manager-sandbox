@@ -3,7 +3,7 @@
 
 #include <stdlib.h>
 
-namespace cuda_mango {
+namespace cuda_daemon {
 
     class CudaClient {
 
