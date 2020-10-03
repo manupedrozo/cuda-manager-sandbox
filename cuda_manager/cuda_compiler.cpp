@@ -5,7 +5,7 @@
 
 namespace cuda_manager {
 
-char *CudaCompiler::compile_to_ptx(const char *source_path) {
+void CudaCompiler::compile_to_ptx(const char *source_path, char **ptx, size_t *ptx_size) {
   std::cout << "Compiling cuda kernel file [" << source_path << "]...\n";
   // Read kernel file
   std::ifstream input_file(source_path, std::ifstream::in | std::ifstream::ate);
@@ -54,15 +54,15 @@ char *CudaCompiler::compile_to_ptx(const char *source_path) {
   std::cout << "Compilation successful\n";
 
   // Get PTX from the program
-  size_t ptx_size;
-  NVRTC_SAFE_CALL(nvrtcGetPTXSize(prog, &ptx_size));
-  char *ptx = new char[ptx_size];
-  NVRTC_SAFE_CALL(nvrtcGetPTX(prog, ptx));
+  size_t _ptx_size;
+  NVRTC_SAFE_CALL(nvrtcGetPTXSize(prog, &_ptx_size));
+  *ptx = new char[_ptx_size];
+  NVRTC_SAFE_CALL(nvrtcGetPTX(prog, *ptx));
 
   // Destroy the program
   NVRTC_SAFE_CALL(nvrtcDestroyProgram(&prog));
 
-  return ptx;
+  if (ptx_size != nullptr) *ptx_size = _ptx_size;
 }
 
 void CudaCompiler::save_ptx_to_file(const char *ptx, const char *output_path) {

@@ -89,15 +89,25 @@ bool parse_integer(int *position, const char *arguments, int *result) {
 }
 
 // @TODO receive size to not depend on correctly terminated strings
-bool parse_arguments(const char *arguments, std::vector<Arg *> &args, char **kernel_path) {
+bool parse_arguments(const char *arguments, std::vector<Arg *> &args, int *kernel_mem_id, char **kernel_name) {
   std::cout << "Parsing arguments: " << arguments << '\n';
 
+  // arg array index
   int i = 0;
-  // Kernel path
-  std::string kernel_path_s = parse_next(&i, arguments, nullptr);
-  size_t kernel_path_size = sizeof(char) * (kernel_path_s.size() + 1);
-  *kernel_path = (char *) malloc(kernel_path_size);
-  strncpy(*kernel_path, kernel_path_s.c_str(), kernel_path_s.size() + 1);
+  bool parse_correct; 
+
+  // Kernel mem_id
+  parse_correct = parse_integer(&i, arguments, kernel_mem_id);
+  if (!parse_correct) {
+    std::cerr << "Error: number expected (kernel mem_id)\n";
+    return false;
+  }
+
+  // Kernel name
+  std::string kernel_name_s = parse_next(&(++i), arguments, nullptr);
+  size_t kernel_name_size = sizeof(char) * (kernel_name_s.size() + 1);
+  *kernel_name = (char *) malloc(kernel_name_size);
+  strncpy(*kernel_name, kernel_name_s.c_str(), kernel_name_s.size() + 1);
 
   // Rest of the arguments
   bool is_number;
@@ -115,7 +125,7 @@ bool parse_arguments(const char *arguments, std::vector<Arg *> &args, char **ker
 
         // In/out
         bool is_in;
-        bool parse_correct = parse_bool(&(++i), arguments, &is_in);
+        parse_correct = parse_bool(&(++i), arguments, &is_in);
         if (!parse_correct) {
           std::cerr << "Error: 1|0 expected (buffer in|out)\n";
           return false;
@@ -175,9 +185,10 @@ bool parse_arguments(const char *arguments, std::vector<Arg *> &args, char **ker
   return true;
 }
 
-std::string args_to_string(std::string kernel_path, std::vector<Arg *> args) {
+std::string args_to_string(std::string kernel_name, int kernel_mem_id, std::vector<Arg *> args) {
 	std::stringstream ss;
-  ss << kernel_path;
+  ss << kernel_mem_id;
+  ss << " " << kernel_name;
 
   for (Arg *arg: args) {
     if (arg->is_buffer) {

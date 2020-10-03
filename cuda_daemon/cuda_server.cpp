@@ -109,19 +109,22 @@ namespace cuda_daemon {
         launch_kernel_command_t *command = (launch_kernel_command_t *) base;
         
         std::vector<cuda_manager::Arg *> parsed_args;
-        char *kernel_path;
-        bool err = cuda_manager::parse_arguments((char *) packet.extra_data.buf, parsed_args, &kernel_path);
+        char *kernel_name;
+        int kernel_mem_id;
+        bool err = cuda_manager::parse_arguments((char *) packet.extra_data.buf, parsed_args, &kernel_mem_id, &kernel_name);
 
         // @TODO there is no data error handling in the server yet
         assert(err && "Argument parsing error");
 
-        // @TODO We are assuming that the kernel ptx file is accessible by path and that the kernel_path is the same as function name inside the ptx file
-        char *ptx = cuda_server->cuda_compiler.read_ptx_from_file(kernel_path);
+        // Get ptx using kernel_mem_id
+        char *ptx = (char*) cuda_server->cuda_manager.memory_manager.get_buffer(kernel_mem_id).ptr;
 
-        cuda_server->cuda_manager.launch_kernel_from_ptx(ptx, kernel_path, parsed_args, 32, 128);
+        // Launch kernel
+        // @TODO change fixed blocks/threads
+        cuda_server->cuda_manager.launch_kernel_from_ptx(ptx, kernel_name, parsed_args, 32, 128);
 
         // Free stuff
-        delete[] kernel_path;
+        delete[] kernel_name;
         delete[] ptx;
         for (cuda_manager::Arg *arg : parsed_args) { free(arg); }
 

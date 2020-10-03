@@ -52,20 +52,21 @@ void test_arg_parser() {
   std::vector<Arg *> args {&arg_a, &arg_x, &arg_y, &arg_o, &arg_n};
 
   // Arguments to a string
+  int kernel_mem_id = 0; // Not using this, we are manually handling memory
   std::cout << "Arguments to string: \n";
-  std::string _arguments = args_to_string(KERNEL_NAME, args);
+  std::string _arguments = args_to_string(KERNEL_NAME, kernel_mem_id, args);
   const char *arguments = _arguments.c_str();
 
   // Parse arguments back from the string
   std::vector<Arg *> parsed_args;
-  char *kernel_path;
-  bool succ = parse_arguments(arguments, parsed_args, &kernel_path);
+  char *kernel_name;
+  bool succ = parse_arguments(arguments, parsed_args, &kernel_mem_id, &kernel_name);
 
   if (!succ) {
     exit(1);
   }
 
-  //std::cout << "Parsed arguments from string kernel [" << kernel_path << "]: \n";
+  //std::cout << "Parsed arguments from string kernel [" << kernel_name << "]: \n";
   //print_args(parsed_args);
 
   // Get ptx and kernel handle
@@ -75,10 +76,10 @@ void test_arg_parser() {
   CUmodule module;
   CUfunction kernel;
   CUDA_SAFE_CALL(cuModuleLoadDataEx(&module, ptx, 0, 0, 0));
-  CUDA_SAFE_CALL(cuModuleGetFunction(&kernel, module, kernel_path));
+  CUDA_SAFE_CALL(cuModuleGetFunction(&kernel, module, kernel_name));
 
-  // Free PTX and kernel_path
-  delete[] kernel_path;
+  // Free PTX and kernel_name_
+  delete[] kernel_name;
   delete[] ptx;
 
   // Launch kernel with parsed arguments
@@ -101,7 +102,9 @@ void manager_launch_kernel_test() {
 
   // Compile and get a kernel handle
   CudaCompiler cuda_compiler;
-  char *ptx = cuda_compiler.compile_to_ptx(KERNEL_PATH);
+  char *ptx;
+  size_t ptx_size;
+  cuda_compiler.compile_to_ptx(KERNEL_PATH, &ptx, &ptx_size);
 
   CUmodule module;
   CUfunction kernel;
@@ -158,7 +161,8 @@ void manual_launch_kernel_test() {
   CudaCompiler cuda_compiler;
 
   // Compile the file to a PTX
-  char *_ptx = cuda_compiler.compile_to_ptx(KERNEL_PATH);
+  char *_ptx;
+  cuda_compiler.compile_to_ptx(KERNEL_PATH, &_ptx);
 
   // Save the PTX file and read it again (for testing purposes)
   cuda_compiler.save_ptx_to_file(_ptx, PTX_PATH);
@@ -224,6 +228,6 @@ void manual_launch_kernel_test() {
 
 int main(void) {
   test_arg_parser();
-  //manager_launch_kernel_test();
-  //manual_launch_kernel_test();
+  manager_launch_kernel_test();
+  manual_launch_kernel_test();
 }

@@ -1,7 +1,7 @@
 #include <stdio.h> 
 
-#include "commands.h"
 #include "cuda_client.h"
+#include "cuda_compiler.h"
 
 // Including these for easy arg parsing
 #include "cuda_common.h"
@@ -9,7 +9,8 @@
 
 
 #define SOCKET_PATH "/tmp/server-test"
-const char *KERNEL_NAME = "saxpy";
+const char *KERNEL_PATH = "saxpy.cu";
+const char *KERNEL_NAME = "saxpy"; // Name of the function inside the kernel file
 
 using namespace cuda_daemon;
 using namespace cuda_manager;
@@ -17,6 +18,20 @@ using namespace cuda_manager;
 int main(int argc, char const *argv[]) { 
 
   CudaClient client(SOCKET_PATH); 
+
+  // Compile kernel to ptx
+  CudaCompiler cuda_compiler;
+  char *ptx;
+  size_t ptx_size;
+  cuda_compiler.compile_to_ptx(KERNEL_PATH, &ptx, &ptx_size);
+
+  // Send ptx and get mem_id handle
+  int kernel_mem_id;
+  client.memory_allocate(ptx_size, &kernel_mem_id);
+  client.memory_write(kernel_mem_id, (void *) ptx, ptx_size);
+
+  delete[] ptx;
+  
 
   size_t n = 100;
   size_t buffer_size = n * sizeof(float);
@@ -51,7 +66,7 @@ int main(int argc, char const *argv[]) {
 
   // Arguments to a string
   std::cout << "Arguments to string: \n";
-  std::string _arguments = args_to_string(KERNEL_NAME, args);
+  std::string _arguments = args_to_string(KERNEL_NAME, kernel_mem_id, args);
   size_t arg_size = _arguments.size() + 1; // + 1 for null terminator
   char *arguments = (char *) _arguments.c_str();
   std::cout << "Arg size: " << arg_size << "\n";
