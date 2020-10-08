@@ -148,8 +148,7 @@ namespace cuda_daemon {
         [&](int id, Server::message_t msg, Server &server) { return handle_command(id, msg, server, this); },
         [&](int id, Server::packet_t packet, Server &server) { return handle_data(id, packet, server, this); }
         ), 
-    cuda_manager(),
-    cuda_compiler() {
+    cuda_manager() {
 
       logger.info("Cuda server starting...");
       Server::InitExitCode err = this->server.initialize();
