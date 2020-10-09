@@ -1,6 +1,6 @@
 #include "server.h"
 #include "commands.h"
-#include "cuda_manager.h"
+#include "cuda_api.h"
 
 namespace cuda_daemon {
 
@@ -10,7 +10,7 @@ class CudaServer {
   Server server;
 
   public:
-  cuda_manager::CudaManager cuda_manager;
+  CudaApi cuda_api;
 
   CudaServer(const char *socket_path);
   ~CudaServer();

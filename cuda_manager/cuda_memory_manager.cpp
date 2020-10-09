@@ -4,6 +4,20 @@
 
 namespace cuda_manager {
 
+void CudaMemoryManager::allocate_buffer(int id, size_t size, void **result_ptr) {
+  assert(size > 0 && "Memory to allocate is 0 or less");
+  void *ptr = malloc(size);
+
+  buffer_count = id + 1;
+
+  printf("[Memory manager] Allocated %zu bytes\n", size);
+
+  MemoryBuffer buffer = { id, size, ptr };
+  buffers.emplace(id, buffer);
+
+  if (result_ptr != nullptr) *result_ptr = ptr;
+}
+
 int CudaMemoryManager::allocate_buffer(size_t size, void **result_ptr) {
   assert(size > 0 && "Memory to allocate is 0 or less");
   void *ptr = malloc(size);

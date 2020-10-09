@@ -15,6 +15,7 @@ class Server {
     public:
         enum class MessageListenerExitCode {
             OK,                     // Success
+            OPERATION_ERROR,        // Error on the cuda api
             INSUFFICIENT_DATA,      // More data needs to be read in order to parse a message
             UNKNOWN_MESSAGE,        // Message received could not be recognized
         };

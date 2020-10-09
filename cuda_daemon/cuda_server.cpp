@@ -18,7 +18,15 @@ namespace cuda_daemon {
 
     logger.info("Received: memory allocate command");
 
-    int mem_id = cuda_server->cuda_manager.memory_manager.allocate_buffer(cmd->size);
+    // @TODO temporal while we decide if we receive the id or address in the comand
+    static int tmp_mem_id = 0;
+    int mem_id = tmp_mem_id++;
+    logger.info("mem_id: {}", mem_id);
+
+    CudaApiExitCode err = cuda_server->cuda_api.allocate_memory(mem_id, cmd->size);
+    if (err != CudaApiExitCode::OK) {
+      return {Server::MessageListenerExitCode::OPERATION_ERROR, sizeof(memory_allocate_command_t), 0};
+    }
 
     memory_allocate_success_command_t *res = (memory_allocate_success_command_t *) malloc(sizeof(memory_allocate_success_command_t));
     init_memory_allocate_success_command(*res, mem_id);
@@ -38,7 +46,12 @@ namespace cuda_daemon {
     logger.info("Received: memory read command");
 
     void *buffer = malloc(cmd->size);
-    cuda_server->cuda_manager.memory_manager.read_buffer(cmd->mem_id, buffer, cmd->size);
+    CudaApiExitCode err = cuda_server->cuda_api.read_memory(cmd->mem_id, buffer, cmd->size);
+
+    if (err != CudaApiExitCode::OK) {
+      return {Server::MessageListenerExitCode::OPERATION_ERROR, sizeof(memory_read_command_t), 0};
+    }
+
     server.send_on_socket(id, {buffer, cmd->size});
     return {Server::MessageListenerExitCode::OK, sizeof(memory_read_command_t), 0};
   }
@@ -102,32 +115,20 @@ namespace cuda_daemon {
       case MEM_WRITE: {
         memory_write_command_t *command = (memory_write_command_t *) base;
 
-        cuda_server->cuda_manager.memory_manager.write_buffer(command->mem_id, packet.extra_data.buf, command->size);
+        CudaApiExitCode err = cuda_server->cuda_api.write_memory(command->mem_id, packet.extra_data.buf, command->size);
+        // @TODO there is no data error handling in the server yet
+        assert(err == OK && "Write memory error");
+
         break;
       }
       case LAUNCH_KERNEL: {
         launch_kernel_command_t *command = (launch_kernel_command_t *) base;
-        
-        std::vector<cuda_manager::Arg *> parsed_args;
-        char *kernel_name;
-        int kernel_mem_id;
-        bool err = cuda_manager::parse_arguments((char *) packet.extra_data.buf, parsed_args, &kernel_mem_id, &kernel_name);
+
+        CudaApiExitCode err = cuda_server->cuda_api.launch_kernel((char *) packet.extra_data.buf, packet.extra_data.size);
 
         // @TODO there is no data error handling in the server yet
-        assert(err && "Argument parsing error");
-
-        // Get ptx using kernel_mem_id
-        char *ptx = (char*) cuda_server->cuda_manager.memory_manager.get_buffer(kernel_mem_id).ptr;
-
-        // Launch kernel
-        // @TODO change fixed blocks/threads
-        cuda_server->cuda_manager.launch_kernel_from_ptx(ptx, kernel_name, parsed_args, 32, 128);
-
-        // Free stuff
-        delete[] kernel_name;
-        delete[] ptx;
-        for (cuda_manager::Arg *arg : parsed_args) { free(arg); }
-
+        assert(err == OK && "Kernel launch error");
+        
         logger.info("Kernel launch completed");
 
         break;
@@ -148,7 +149,7 @@ namespace cuda_daemon {
         [&](int id, Server::message_t msg, Server &server) { return handle_command(id, msg, server, this); },
         [&](int id, Server::packet_t packet, Server &server) { return handle_data(id, packet, server, this); }
         ), 
-    cuda_manager() {
+    cuda_api() {
 
       logger.info("Cuda server starting...");
       Server::InitExitCode err = this->server.initialize();

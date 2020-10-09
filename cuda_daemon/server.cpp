@@ -387,6 +387,7 @@ Server::Socket::ReceiveMessagesExitCode Server::Socket::consume_message_buffer()
         size_t usable_buffer_size = receiving_message.byte_offset - buffer_start;
         message_result_t res = msg_listener({receiving_message.buf + buffer_start, usable_buffer_size});
         switch(res.exit_code) {
+            case MessageListenerExitCode::OPERATION_ERROR:
             case MessageListenerExitCode::UNKNOWN_MESSAGE:
                 return ReceiveMessagesExitCode::ERROR;
                 break;

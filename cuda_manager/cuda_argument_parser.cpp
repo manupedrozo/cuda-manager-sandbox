@@ -89,12 +89,21 @@ bool parse_integer(int *position, const char *arguments, int *result) {
 }
 
 // @TODO receive size to not depend on correctly terminated strings
-bool parse_arguments(const char *arguments, std::vector<Arg *> &args, int *kernel_mem_id, char **kernel_name) {
+bool parse_arguments(const char *arguments, char **parsed_args, int *arg_count, int *kernel_mem_id, char **kernel_name, CudaMemoryManager *memory_manager) {
   std::cout << "Parsing arguments: " << arguments << '\n';
 
-  // arg array index
-  int i = 0;
+  // Allocate memory for arguments
+  size_t args_total_size = 1024 * 8;
+  char *args = (char *) malloc(args_total_size);
+  int args_count = 0;
+  size_t args_size = 0;
+
+  // Save base ptr
+  *parsed_args = args;
+
+  int i = 0; // arguments index
   bool parse_correct; 
+  bool is_number;
 
   // Kernel mem_id
   parse_correct = parse_integer(&i, arguments, kernel_mem_id);
@@ -110,7 +119,6 @@ bool parse_arguments(const char *arguments, std::vector<Arg *> &args, int *kerne
   strncpy(*kernel_name, kernel_name_s.c_str(), kernel_name_s.size() + 1);
 
   // Rest of the arguments
-  bool is_number;
   char c = arguments[i];
   while (c != '\0') {
     if (c == ' ') c = arguments[++i];
@@ -132,6 +140,7 @@ bool parse_arguments(const char *arguments, std::vector<Arg *> &args, int *kerne
         }
 
         // Size
+        // @TODO size not required any more, remove it from string args
         int size;
         parse_correct = parse_integer(&(++i), arguments, &size);
         if (!parse_correct) {
@@ -158,8 +167,20 @@ bool parse_arguments(const char *arguments, std::vector<Arg *> &args, int *kerne
             return false;
         }
 
-        Arg *arg = new BufferArg(id, (size_t)size, is_in);
-        args.push_back(arg);
+        size_t new_args_size = args_size + sizeof(BufferArg);
+        if(args_total_size <= args_size) {
+          std::cerr << "Ran out of memory for arguments\n";
+          return false;
+        }
+
+        // @TODO error if not found
+        MemoryBuffer memory_buffer = memory_manager->get_buffer(id);
+
+        BufferArg *arg = (BufferArg *)args;
+        *arg = {BUFFER, memory_buffer.ptr, id, memory_buffer.size, is_in};
+        ++args_count;
+        args_size = new_args_size;
+        args += sizeof(BufferArg);
 
         std::cout << "Buffer: is_in = " << is_in << " size = " << size << " id = " << id << '\n';
       }
@@ -168,44 +189,70 @@ bool parse_arguments(const char *arguments, std::vector<Arg *> &args, int *kerne
       // Number
       else if (is_number) {
         float value = std::stof(current_arg); // TODO support multiple types
-        Arg *arg = new ValueArg<float>(value, sizeof(float), true);
-        args.push_back(arg);
+
+        size_t new_args_size = args_size + sizeof(ValueArg);
+        if(args_total_size <= args_size) {
+          std::cerr << "Ran out of memory for arguments\n";
+          return false;
+        }
+
+        ValueArg *arg = (ValueArg *)args;
+        *arg = {VALUE, value};
+        ++args_count;
+        args_size += new_args_size;
+        args += sizeof(ValueArg);
+
         std::cout << "Number: " << current_arg << '\n';
       }
 
       // String
       else {
-        std::cout << "String: " << current_arg << " NOT SUPPORTED YET\n";
+        std::cerr << "String: " << current_arg << " NOT SUPPORTED YET\n";
         return false;
       }
     }
     c = arguments[i];
   }
+
+  *arg_count = args_count;
   
   return true;
 }
 
-std::string args_to_string(std::string kernel_name, int kernel_mem_id, std::vector<Arg *> args) {
+// Receiving a void * vector here since we only use this for testing and makes it easy for the test.
+std::string args_to_string(std::string kernel_name, int kernel_mem_id, std::vector<void *> args) {
 	std::stringstream ss;
   ss << kernel_mem_id;
   ss << " " << kernel_name;
 
-  for (Arg *arg: args) {
-    if (arg->is_buffer) {
-      ss << " b " << arg->is_in << ' ' << arg->size << ' ' << arg->get_id(); //<< std::hex << arg->get_value_ptr() << std::dec;
-    } else {
-      // Using only float since this is for testing purposes
-      ss << ' ' << *(float *)arg->get_value_ptr();
+  for (void *arg: args) {
+    Arg *base = (Arg *) arg; 
+    switch (base->type) {
+      case BUFFER: 
+      {
+        BufferArg *buffer_arg = (BufferArg *) arg; 
+        ss << " b " << buffer_arg->is_in << ' ' << buffer_arg->size << ' ' << buffer_arg->id; //<< std::hex << buffer_arg->ptr << std::dec;
+        break;
+      }
+      case VALUE:
+      {
+        ValueArg *value_arg = (ValueArg *) arg;
+        ss << ' ' << value_arg->value;
+        break;
+      }
     }
   }
   return ss.str();
 }
 
-void print_args(std::vector<Arg *> args) {
+void print_args(std::vector<void *> args) {
   int i = 0;
+  std::cout << "print_args not implemented\n"; 
+  /*
   for (Arg *arg: args) {
     std::cout << ++i << ") is_buffer = " << arg->is_buffer << " value = " << arg->get_value_ptr() << " size = " << arg->size << " ptr = " << arg->get_value_ptr() << " is_in = " << arg->is_in << '\n';
   }
+  */
 }
 
 }

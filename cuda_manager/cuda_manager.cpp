@@ -41,7 +41,7 @@ CudaManager::~CudaManager() {
 }
 
 
-void CudaManager::launch_kernel_from_ptx(const char *ptx, const char* function_name, const std::vector<Arg *> args, const uint32_t num_blocks, const uint32_t num_threads) {
+void CudaManager::launch_kernel_from_ptx(const char *ptx, const char* function_name, char *args, int arg_count, const uint32_t num_blocks, const uint32_t num_threads) {
   // Set context where to launch the kernel
   CUDA_SAFE_CALL(cuCtxSetCurrent(contexts[0])); // TODO just using one context for now
 
@@ -52,54 +52,68 @@ void CudaManager::launch_kernel_from_ptx(const char *ptx, const char* function_n
   CUDA_SAFE_CALL(cuModuleGetFunction(&kernel, module, function_name));
 
   // Launch kernel in current context
-  launch_kernel(kernel, args, num_blocks, num_threads);
+  launch_kernel(kernel, args, arg_count, num_blocks, num_threads);
 
   // Unload module
   CUDA_SAFE_CALL(cuModuleUnload(module));
 }
 
 
-void CudaManager::launch_kernel(const CUfunction kernel, const std::vector<Arg *> args, const uint32_t num_blocks, const uint32_t num_threads) {
-  void *kernel_args[args.size()]; // Args to be passed on kernel launch
+void CudaManager::launch_kernel(const CUfunction kernel, char *args, int arg_count, const uint32_t num_blocks, const uint32_t num_threads) {
+  void *kernel_args[arg_count]; // Args to be passed on kernel launch
   std::vector<CudaBuffer> buffers; // Keep track of buffers 
 
   std::cout << "Parsing arguments...\n";
-  for (int i = 0; i < args.size(); ++i) {
-    Arg *arg = args[i];
-    if (arg->is_buffer) {
-      MemoryBuffer mem_buffer = memory_manager.get_buffer(arg->get_id());
 
-      // Create cuda buffer and copy to device if its an input buffer
-      // The buffer must be created inside the vector and then used as a reference
-      // This allows us to use pointers to its members (d_ptr)
-      buffers.push_back(CudaBuffer());
-      CudaBuffer &cuda_buffer = buffers[buffers.size() - 1];
+  char *current_arg = args;
+  for (int i = 0; i < arg_count; ++i) {
+    Arg *base = (Arg *) current_arg;
 
-      cuda_buffer.h_ptr = mem_buffer.ptr;
-      cuda_buffer.size  = mem_buffer.size;
-      cuda_buffer.is_in = arg->is_in;
-      
-      CUDA_SAFE_CALL(cuMemAlloc(&cuda_buffer.d_ptr, cuda_buffer.size));
+    switch (base->type) {
+      case BUFFER: 
+      {
+        BufferArg *arg = (BufferArg *) base; 
+        current_arg += sizeof(BufferArg);
 
-      std::cout << "Buffer arg: h_ptr = " << cuda_buffer.h_ptr << 
-                             "  size = " << cuda_buffer.size << 
-                             "  is_in = " << cuda_buffer.is_in << 
-                             "  d_ptr = " << cuda_buffer.d_ptr << "\n";
+        // Create cuda buffer and copy to device if its an input buffer
+        // The buffer must be created inside the vector and then used as a reference
+        // This allows us to use pointers to its members (d_ptr)
+        buffers.push_back(CudaBuffer());
+        CudaBuffer &cuda_buffer = buffers[buffers.size() - 1];
 
-      if (cuda_buffer.is_in) {
-        std::cout << "Copied HtoD " << cuda_buffer.h_ptr << " to " << cuda_buffer.d_ptr << "\n";
-        CUDA_SAFE_CALL(cuMemcpyHtoD(cuda_buffer.d_ptr, cuda_buffer.h_ptr, cuda_buffer.size));
+        cuda_buffer.h_ptr = arg->ptr;
+        cuda_buffer.size  = arg->size;
+        cuda_buffer.is_in = arg->is_in;
+
+        CUDA_SAFE_CALL(cuMemAlloc(&cuda_buffer.d_ptr, cuda_buffer.size));
+
+        std::cout << "Buffer arg: h_ptr = " << cuda_buffer.h_ptr << 
+          "  size = "  << cuda_buffer.size << 
+          "  is_in = " << cuda_buffer.is_in << 
+          "  d_ptr = " << cuda_buffer.d_ptr << "\n";
+
+        if (cuda_buffer.is_in) {
+          std::cout << "Copied HtoD " << cuda_buffer.h_ptr << " to " << cuda_buffer.d_ptr << "\n";
+          CUDA_SAFE_CALL(cuMemcpyHtoD(cuda_buffer.d_ptr, cuda_buffer.h_ptr, cuda_buffer.size));
+        }
+
+        kernel_args[i] = (void *) &cuda_buffer.d_ptr;
+        break;
       }
+      case VALUE:
+      {
+        ValueArg *arg = (ValueArg *) base;
+        current_arg += sizeof(ValueArg);
 
-      kernel_args[i] = (void *) &cuda_buffer.d_ptr;
-    }
-    else {
-      // Might print incorrect value since we are assuming float, but checking type is overkill
-      std::cout << "Scalar arg: value = " << *(float *)arg->get_value_ptr() << 
-                              " ptr = " << arg->get_value_ptr() << "\n";
+        // float only for now
+        std::cout << "Scalar arg: value = " << arg->value << "\n";
 
-      // Use address of the argument in the original array
-      kernel_args[i] = args[i]->get_value_ptr();
+        // Use address of the argument in the original array
+        // Might need to allocate memory for the value so arguments can be freed right away
+        kernel_args[i] = &arg->value;
+
+        break;
+      }
     }
   }
 

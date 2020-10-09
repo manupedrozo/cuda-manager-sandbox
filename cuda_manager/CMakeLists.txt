@@ -4,8 +4,8 @@ set(MANGO_ROOT /opt/mango)
 
 project(cuda_sandbox LANGUAGES CXX CUDA)
 
-set(SOURCES cuda_manager.cpp cuda_compiler.cpp cuda_argument_parser.cpp cuda_memory_manager.cpp)
-set(HEADERS cuda_common.h cuda_argument_parser.h cuda_compiler.h cuda_manager.h cuda_memory_manager.h)
+set(SOURCES cuda_manager.cpp cuda_compiler.cpp cuda_argument_parser.cpp cuda_memory_manager.cpp cuda_api.cpp)
+set(HEADERS cuda_common.h cuda_argument_parser.h cuda_compiler.h cuda_manager.h cuda_memory_manager.h cuda_api.h)
 
 add_library(cuda_manager SHARED ${SOURCES})
 add_executable(launch_kernel_test main.cpp)

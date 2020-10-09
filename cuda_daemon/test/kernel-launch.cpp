@@ -55,14 +55,14 @@ int main(int argc, char const *argv[]) {
   client.memory_write(xid, (void *) x, buffer_size);
   client.memory_write(yid, (void *) y, buffer_size);
 
-  // Arguments
-  ValueArg<float> arg_a(a, sizeof(float), true);
-  BufferArg arg_x(xid, buffer_size, true);
-  BufferArg arg_y(yid, buffer_size, true);
-  BufferArg arg_o(oid, buffer_size, false);
-  ValueArg<float> arg_n(n, sizeof(float), true);
+  // Doing it this way to easily convert them to string, in reality you need to manually create the string
+  ValueArg  arg_a = {VALUE, a};
+  BufferArg arg_x = {BUFFER, nullptr, xid, buffer_size, true};
+  BufferArg arg_y = {BUFFER, nullptr, yid, buffer_size, true};
+  BufferArg arg_o = {BUFFER, nullptr, oid, buffer_size, false};
+  ValueArg  arg_n = {VALUE, (float)n};
 
-  std::vector<Arg *> args {&arg_a, &arg_x, &arg_y, &arg_o, &arg_n};
+  std::vector<void *> args {(void *)&arg_a, (void *)&arg_x, (void *)&arg_y, (void *)&arg_o, (void *)&arg_n};
 
   // Arguments to a string
   std::cout << "Arguments to string: \n";
@@ -84,5 +84,4 @@ int main(int argc, char const *argv[]) {
   delete[] x;
   delete[] y;
   delete[] o;
-
 }

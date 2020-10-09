@@ -6,6 +6,7 @@
 #include <iostream>
 #include "cuda_common.h"
 #include "cuda_argument_parser.h"
+#include "cuda_api.h"
 #include "cuda_manager.h"
 #include "cuda_compiler.h"
 
@@ -19,6 +20,7 @@ const char *PTX_PATH        = "saxpy";
 
 using namespace cuda_manager;
 
+/*
 // Requires compiled ptx
 void test_arg_parser() {
   CudaManager cuda_manager;
@@ -225,9 +227,84 @@ void manual_launch_kernel_test() {
   delete[] hY;
   delete[] hOut;
 }
+*/
+
+void test_api() {
+  CudaApi cuda_api;
+  CudaCompiler cuda_compiler;
+
+  // Compile kernel to ptx
+  char *ptx;
+  size_t ptx_size;
+  cuda_compiler.compile_to_ptx(KERNEL_PATH, &ptx, &ptx_size);
+
+  // Allocate and write ptx
+  int kernel_mem_id = 0;
+  cuda_api.allocate_memory(kernel_mem_id, ptx_size);
+  cuda_api.write_memory(kernel_mem_id, (void *) ptx, ptx_size);
+
+  delete[] ptx;
+
+  // Setup input and output buffers
+  size_t n = 100;
+  size_t buffer_size = n * sizeof(float);
+  float a = 2.5f;
+  float *x = new float[n], *y = new float[n], *o = new float[n];
+
+  for (size_t i = 0; i < n; ++i) {
+    x[i] = static_cast<float>(i);
+    y[i] = static_cast<float>(i * 2);
+  }
+
+  // Allocate and write buffers
+  int xid = 1;
+  int yid = 2;
+  int oid = 3;
+  cuda_api.allocate_memory(xid, buffer_size);
+  cuda_api.allocate_memory(yid, buffer_size);
+  cuda_api.allocate_memory(oid, buffer_size);
+  printf("Allocated buffer x id: %d\n", xid);
+  printf("Allocated buffer y id: %d\n", yid);
+  printf("Allocated buffer o id: %d\n", oid);
+
+  cuda_api.write_memory(xid, (void *) x, buffer_size);
+  cuda_api.write_memory(yid, (void *) y, buffer_size);
+
+  // Set up arguments
+  // Doing it this way to easily convert them to string, in reality you need to manually create the string
+  ValueArg  arg_a = {VALUE, a};
+  BufferArg arg_x = {BUFFER, nullptr, xid, buffer_size, true};
+  BufferArg arg_y = {BUFFER, nullptr, yid, buffer_size, true};
+  BufferArg arg_o = {BUFFER, nullptr, oid, buffer_size, false};
+  ValueArg  arg_n = {VALUE, (float)n};
+
+  std::vector<void *> args {(void *)&arg_a, (void *)&arg_x, (void *)&arg_y, (void *)&arg_o, (void *)&arg_n};
+  
+  // Arguments to a string
+  std::cout << "Arguments to string: \n";
+  std::string _arguments = args_to_string(KERNEL_NAME, kernel_mem_id, args);
+  size_t arg_size = _arguments.size() + 1; // + 1 for null terminator
+  char *arguments = (char *) _arguments.c_str();
+  std::cout << "Arg size: " << arg_size << "\n";
+  std::cout << arguments << "\n";
+
+  // Launch kernel
+  cuda_api.launch_kernel(arguments, arg_size);
+
+  cuda_api.read_memory(oid, (void *)o, buffer_size);
+
+  for (size_t i = 0; i < 10; ++i) { // first 10 results only
+    std::cout << a << " * " << x[i] << " + " << y[i] << " = " << o[i] << '\n';
+  }
+
+  delete[] x;
+  delete[] y;
+  delete[] o;
+}
 
 int main(void) {
-  test_arg_parser();
-  manager_launch_kernel_test();
-  manual_launch_kernel_test();
+  test_api();
+  //test_arg_parser();
+  //manager_launch_kernel_test();
+  //manual_launch_kernel_test();
 }

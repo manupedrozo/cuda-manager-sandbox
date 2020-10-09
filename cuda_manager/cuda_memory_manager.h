@@ -1,3 +1,5 @@
+#ifndef CUDA_MEMORY_MANAGER_H
+#define CUDA_MEMORY_MANAGER_H
 #include <map>
 #include <string.h>
 
@@ -16,13 +18,12 @@ private:
   std::map<int, MemoryBuffer> buffers;
   int buffer_count = 0;
 
-
 public:
-
   CudaMemoryManager() {}
   ~CudaMemoryManager() {}
 
   int allocate_buffer(size_t size, void **result_ptr = nullptr);
+  void allocate_buffer(int id, size_t size, void **result_ptr = nullptr);
   void deallocate_buffer(int id);
   MemoryBuffer get_buffer(int id);
   void write_buffer(int id, void *data, size_t size);
@@ -30,3 +31,5 @@ public:
 };
 
 }
+
+#endif
