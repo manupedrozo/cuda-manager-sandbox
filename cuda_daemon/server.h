@@ -15,9 +15,14 @@ class Server {
 public:
   enum class MessageListenerExitCode {
     OK,                // Success
-    OPERATION_ERROR,   // Error on the cuda api
+    OPERATION_ERROR,   // Error on the listener operation
     INSUFFICIENT_DATA, // More data needs to be read in order to parse a message
     UNKNOWN_MESSAGE,   // Message received could not be recognized
+  };
+
+  enum class DataListenerExitCode {
+    OK,                // Success
+    OPERATION_ERROR,   // Error on the listener operation
   };
 
   enum class InitExitCode {
@@ -64,7 +69,7 @@ public:
         * \param packet_t Packet received, containing the mesage that asked for extra data and the extra data itself.
         * \param Server& Reference to the server.
         */
-  typedef std::function<void(int, packet_t, Server &)> data_listener_t;
+  typedef std::function<Server::DataListenerExitCode(int, packet_t, Server &)> data_listener_t;
 
   Server(std::string socket_path, int max_connections, msg_listener_t msg_listener, data_listener_t data_listener);
   ~Server();
@@ -103,7 +108,7 @@ private:
     };
 
     typedef std::function<Server::message_result_t(message_t)> socket_msg_listener_t;
-    typedef std::function<void(packet_t)> socket_data_listener_t;
+    typedef std::function<Server::DataListenerExitCode(packet_t)> socket_data_listener_t;
 
     Socket(int fd, socket_msg_listener_t msg_listener, socket_data_listener_t data_listener);
     ~Socket();

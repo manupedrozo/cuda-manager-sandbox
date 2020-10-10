@@ -73,74 +73,75 @@ Server::message_result_t CudaServer::handle_command(int id, Server::message_t ms
   }
   command_base_t *base = (command_base_t *)msg.buf;
   switch (base->cmd) {
-  case MEM_ALLOC:
-    if (msg.size >= sizeof(memory_allocate_command_t)) {
-      return handle_memory_allocate_command(id, (memory_allocate_command_t *)msg.buf, server);
-    }
-    break;
-  case MEM_WRITE:
-    if (msg.size >= sizeof(memory_write_command_t)) {
-      return handle_memory_write_command(id, (memory_write_command_t *)msg.buf, server);
-    }
-    break;
-  case MEM_READ:
-    if (msg.size >= sizeof(memory_read_command_t)) {
-      return handle_memory_read_command(id, (memory_read_command_t *)msg.buf, server);
-    }
-    break;
-  case LAUNCH_KERNEL:
-    if (msg.size >= sizeof(launch_kernel_command_t)) {
-      return handle_launch_kernel_command(id, (launch_kernel_command_t *)msg.buf, server);
-    }
-    break;
-  case VARIABLE:
-    if (msg.size >= sizeof(variable_length_command_t)) {
-      return handle_variable_length_command(id, (variable_length_command_t *)msg.buf, server);
-    }
-    break;
-  default:
-    logger.info("Received: unknown command");
-    return {Server::MessageListenerExitCode::UNKNOWN_MESSAGE, 0, 0};
-    break;
+    case MEM_ALLOC:
+      if (msg.size >= sizeof(memory_allocate_command_t)) {
+        return handle_memory_allocate_command(id, (memory_allocate_command_t *)msg.buf, server);
+      }
+      break;
+    case MEM_WRITE:
+      if (msg.size >= sizeof(memory_write_command_t)) {
+        return handle_memory_write_command(id, (memory_write_command_t *)msg.buf, server);
+      }
+      break;
+    case MEM_READ:
+      if (msg.size >= sizeof(memory_read_command_t)) {
+        return handle_memory_read_command(id, (memory_read_command_t *)msg.buf, server);
+      }
+      break;
+    case LAUNCH_KERNEL:
+      if (msg.size >= sizeof(launch_kernel_command_t)) {
+        return handle_launch_kernel_command(id, (launch_kernel_command_t *)msg.buf, server);
+      }
+      break;
+    case VARIABLE:
+      if (msg.size >= sizeof(variable_length_command_t)) {
+        return handle_variable_length_command(id, (variable_length_command_t *)msg.buf, server);
+      }
+      break;
+    default:
+      logger.info("Received: unknown command");
+      return {Server::MessageListenerExitCode::UNKNOWN_MESSAGE, 0, 0};
+      break;
   }
   return {Server::MessageListenerExitCode::INSUFFICIENT_DATA, 0, 0};
 }
 
-void CudaServer::handle_data(int id, Server::packet_t packet, Server &server) {
+Server::DataListenerExitCode CudaServer::handle_data(int id, Server::packet_t packet, Server &server) {
   logger.info("Received data, size: {}", packet.extra_data.size);
 
   command_base_t *base = (command_base_t *)packet.msg.buf;
   switch (base->cmd) {
-  case MEM_WRITE: {
-    memory_write_command_t *command = (memory_write_command_t *)base;
+    case MEM_WRITE: {
+      memory_write_command_t *command = (memory_write_command_t *)base;
 
-    CudaApiExitCode err = cuda_api.write_memory(command->mem_id, packet.extra_data.buf, command->size);
-    // @TODO there is no data error handling in the server yet
-    assert(err == OK && "Write memory error");
+      CudaApiExitCode err = cuda_api.write_memory(command->mem_id, packet.extra_data.buf, command->size);
+      // @TODO there is no data error handling in the server yet
+      assert(err == OK && "Write memory error");
 
-    break;
-  }
-  case LAUNCH_KERNEL: {
-    launch_kernel_command_t *command = (launch_kernel_command_t *)base;
+      break;
+    }
+    case LAUNCH_KERNEL: {
+      launch_kernel_command_t *command = (launch_kernel_command_t *)base;
 
-    CudaApiExitCode err = cuda_api.launch_kernel((char *)packet.extra_data.buf, packet.extra_data.size);
+      CudaApiExitCode err = cuda_api.launch_kernel((char *)packet.extra_data.buf, packet.extra_data.size);
 
-    // @TODO there is no data error handling in the server yet
-    assert(err == OK && "Kernel launch error");
+      // @TODO there is no data error handling in the server yet
+      assert(err == OK && "Kernel launch error");
 
-    logger.info("Kernel launch completed");
+      logger.info("Kernel launch completed");
 
-    break;
-  }
-  default: {
-    logger.info("Data from unsupported command: {}", (char *)packet.extra_data.buf);
-    break;
-  }
+      break;
+    }
+    default: {
+      logger.info("Data from unsupported command: {}", (char *)packet.extra_data.buf);
+      break;
+    }
   }
 
   free(packet.extra_data.buf);
   free(packet.msg.buf);
   server.send_on_socket(id, {create_ack(), sizeof(command_base_t)});
+  return Server::DataListenerExitCode::OK;
 }
 
 CudaServer::CudaServer(const char *socket_path)

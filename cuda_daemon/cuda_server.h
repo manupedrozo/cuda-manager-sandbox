@@ -15,7 +15,7 @@ private:
 
   Server::message_result_t handle_command(int id, Server::message_t msg, Server &server);
 
-  void handle_data(int id, Server::packet_t packet, Server &server);
+  Server::DataListenerExitCode handle_data(int id, Server::packet_t packet, Server &server);
 
   Server::message_result_t handle_memory_allocate_command(int id, const memory_allocate_command_t *cmd, Server &server);
   Server::message_result_t handle_memory_write_command(int id, const memory_write_command_t *cmd, Server &server);

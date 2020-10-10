@@ -146,42 +146,42 @@ Server::StartExitCode Server::server_loop() {
         if (socket_events & POLLIN) { // Ready to read
           if (i == listen_idx) {      // Listen socket, new connection available
             switch (accept_new_connection()) {
-            case Server::AcceptConnectionExitCode::ERROR:
-              logger.critical("server_loop ({}): Accept error, ending server", loop);
-              close_sockets();
-              return StartExitCode::ERROR;
-              break;
-            case Server::AcceptConnectionExitCode::OK:
-              break;
+              case Server::AcceptConnectionExitCode::ERROR:
+                logger.critical("server_loop ({}): Accept error, ending server", loop);
+                close_sockets();
+                return StartExitCode::ERROR;
+                break;
+              case Server::AcceptConnectionExitCode::OK:
+                break;
             }
           } else {
             switch (sockets[i]->receive_messages()) {
-            case Socket::ReceiveMessagesExitCode::ERROR:
-              logger.error("server_loop ({}): Receive error", loop);
-              close_socket(i);
-              events_left--;
-              continue;
-              break;
-            case Socket::ReceiveMessagesExitCode::HANG_UP:
-              logger.info("server_loop ({}): Client closed connection on socket {}", loop, i);
-              close_socket(i);
-              events_left--;
-              continue;
-              break;
-            case Socket::ReceiveMessagesExitCode::OK:
-              break;
+              case Socket::ReceiveMessagesExitCode::ERROR:
+                logger.error("server_loop ({}): Receive error", loop);
+                close_socket(i);
+                events_left--;
+                continue;
+                break;
+              case Socket::ReceiveMessagesExitCode::HANG_UP:
+                logger.info("server_loop ({}): Client closed connection on socket {}", loop, i);
+                close_socket(i);
+                events_left--;
+                continue;
+                break;
+              case Socket::ReceiveMessagesExitCode::OK:
+                break;
             }
           }
         }
         if (socket_events & POLLOUT) { // Ready to write
           switch (sockets[i]->send_messages()) {
-          case Socket::SendMessagesExitCode::ERROR:
-            logger.error("server_loop ({}): Send error", loop);
-            close_socket(i);
-            events_left--;
-            continue;
-          case Socket::SendMessagesExitCode::OK:
-            break;
+            case Socket::SendMessagesExitCode::ERROR:
+              logger.error("server_loop ({}): Send error", loop);
+              close_socket(i);
+              events_left--;
+              continue;
+            case Socket::SendMessagesExitCode::OK:
+              break;
           }
         }
         if (socket_events & POLLPRI) { // Exceptional condition (very rare)
@@ -387,29 +387,29 @@ Server::Socket::ReceiveMessagesExitCode Server::Socket::consume_message_buffer()
     size_t usable_buffer_size = receiving_message.byte_offset - buffer_start;
     message_result_t res = msg_listener({receiving_message.buf + buffer_start, usable_buffer_size});
     switch (res.exit_code) {
-    case MessageListenerExitCode::OPERATION_ERROR:
-    case MessageListenerExitCode::UNKNOWN_MESSAGE:
-      return ReceiveMessagesExitCode::ERROR;
-      break;
-    case MessageListenerExitCode::INSUFFICIENT_DATA:
-      if (usable_buffer_size == BUFFER_SIZE) {
-        logger.error("consume_message_buffer: Buffer filled but a command couldn't be parsed");
+      case MessageListenerExitCode::OPERATION_ERROR:
+      case MessageListenerExitCode::UNKNOWN_MESSAGE:
         return ReceiveMessagesExitCode::ERROR;
-      } else {
-        memmove(receiving_message.buf, receiving_message.buf + buffer_start, usable_buffer_size);
-        more_data_needed = true;
-      }
-      break;
-    case MessageListenerExitCode::OK:
-      if (res.expect_data > 0) {
-        receiving_data.waiting = true;
-        receiving_data.data = {malloc(res.expect_data), res.expect_data};
-        void *msg_buf_copy = malloc(res.bytes_consumed);
-        memcpy(msg_buf_copy, receiving_message.buf + buffer_start, res.bytes_consumed);
-        receiving_data.msg = {msg_buf_copy, res.bytes_consumed};
-      }
-      buffer_start += res.bytes_consumed;
-      break;
+        break;
+      case MessageListenerExitCode::INSUFFICIENT_DATA:
+        if (usable_buffer_size == BUFFER_SIZE) {
+          logger.error("consume_message_buffer: Buffer filled but a command couldn't be parsed");
+          return ReceiveMessagesExitCode::ERROR;
+        } else {
+          memmove(receiving_message.buf, receiving_message.buf + buffer_start, usable_buffer_size);
+          more_data_needed = true;
+        }
+        break;
+      case MessageListenerExitCode::OK:
+        if (res.expect_data > 0) {
+          receiving_data.waiting = true;
+          receiving_data.data = {malloc(res.expect_data), res.expect_data};
+          void *msg_buf_copy = malloc(res.bytes_consumed);
+          memcpy(msg_buf_copy, receiving_message.buf + buffer_start, res.bytes_consumed);
+          receiving_data.msg = {msg_buf_copy, res.bytes_consumed};
+        }
+        buffer_start += res.bytes_consumed;
+        break;
     }
     // it is possible that we handle a variable_length_command, which means that whatever is left on the buffer needs to be handled as pure data
     const bool data_in_buffer = receiving_data.waiting && buffer_start < receiving_message.byte_offset;
