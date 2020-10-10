@@ -1,4 +1,5 @@
 #include "cuda_compiler.h"
+#include "cuda_common.h"
 #include <nvrtc.h>
 #include <fstream>
 #include <iostream>

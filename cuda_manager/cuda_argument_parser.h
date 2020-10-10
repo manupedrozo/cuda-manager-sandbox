@@ -1,4 +1,4 @@
-#include "cuda_common.h"
+#include "kernel_arguments.h"
 #include "cuda_memory_manager.h"
 #include <vector>
 #include <string>

@@ -1,5 +1,5 @@
-#ifndef CUDA_COMMON
-#define CUDA_COMMON
+#ifndef CUDA_COMMON_H
+#define CUDA_COMMON_H
 
 #include <nvrtc.h>
 #include <cuda.h>
@@ -27,31 +27,4 @@
     }                                                             \
   } while(0)
 
-namespace cuda_manager {
-
-enum ArgType {
-  BUFFER,
-  VALUE
-};
-
-struct Arg {
-  ArgType type;
-};
-
-struct ValueArg {
-  ArgType type;
-  float value;
-};
-
-struct BufferArg {
-  ArgType type;
-  void *ptr;
-  int id;
-  size_t size;
-  bool is_in;
-};
-
-}
-
 #endif
-

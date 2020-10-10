@@ -1,5 +1,4 @@
-#include "cuda_common.h"
-
+#include <stdlib.h>
 
 namespace cuda_manager {
 

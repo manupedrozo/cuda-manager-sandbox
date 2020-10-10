@@ -1,10 +1,11 @@
-#include <stdio.h> 
+#include <stdio.h>
+#include <iostream> 
 
 #include "cuda_client.h"
 #include "cuda_compiler.h"
 
 // Including these for easy arg parsing
-#include "cuda_common.h"
+#include "kernel_arguments.h"
 #include "cuda_argument_parser.h"
 
 

@@ -1,5 +1,5 @@
 #include "cuda_argument_parser.h"
-#include "cuda_common.h"
+#include "kernel_arguments.h"
 #include <vector>
 #include <iostream>
 #include <sstream>

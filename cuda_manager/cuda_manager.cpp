@@ -1,5 +1,6 @@
 #include "cuda_manager.h"
 #include "cuda_common.h"
+#include "kernel_arguments.h"
 #include <cuda.h>
 #include <vector>
 #include <iostream>
