@@ -5,35 +5,35 @@
 
 namespace cuda_daemon {
 
-    class CudaClient {
+class CudaClient {
 
-        enum ExitCode {
-            OK,             // successful operation
-            ERROR,          // generic error in the request
-            SEVERE_ERROR,   // error that leaves the client unusable
-        };
+public:
+  enum ExitCode {
+    OK,           // successful operation
+    ERROR,        // generic error in the request
+    SEVERE_ERROR, // error that leaves the client unusable
+  };
 
-        public:
-            CudaClient(const char* socket_path);
+  CudaClient(const char *socket_path);
 
-            ~CudaClient();
+  ~CudaClient();
 
-            CudaClient::ExitCode memory_allocate(size_t size, int *mem_id);
+  CudaClient::ExitCode memory_allocate(size_t size, int *mem_id);
 
-            CudaClient::ExitCode memory_release(int mem_id);
+  CudaClient::ExitCode memory_release(int mem_id);
 
-            CudaClient::ExitCode memory_write(int id, void *buf, size_t size);
+  CudaClient::ExitCode memory_write(int id, void *buf, size_t size);
 
-            CudaClient::ExitCode memory_read(int id, void *buf, size_t size);
+  CudaClient::ExitCode memory_read(int id, void *buf, size_t size);
 
-            CudaClient::ExitCode launch_kernel(char *arg_string, size_t size);
+  CudaClient::ExitCode launch_kernel(char *arg_string, size_t size);
 
-        private:
-            int socket_fd;
+private:
+  int socket_fd;
 
-            void close_socket();
-    };
+  void close_socket();
+};
 
-}
+} // namespace cuda_daemon
 
 #endif
