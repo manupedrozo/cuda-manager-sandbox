@@ -139,14 +139,14 @@ bool parse_arguments(const char *arguments, char **parsed_args, int *arg_count, 
           return false;
         }
 
-        // Size
-        // @TODO size not required any more, remove it from string args
+        /* Size, no longer required
         int size;
         parse_correct = parse_integer(&(++i), arguments, &size);
         if (!parse_correct) {
           std::cerr << "Error: number expected (buffer size)\n";
           return false;
         }
+        */
 
         /* Not a ptr any more
         // Ptr
@@ -182,7 +182,7 @@ bool parse_arguments(const char *arguments, char **parsed_args, int *arg_count, 
         args_size = new_args_size;
         args += sizeof(BufferArg);
 
-        std::cout << "Buffer: is_in = " << is_in << " size = " << size << " id = " << id << '\n';
+        std::cout << "Buffer: is_in = " << is_in << " id = " << id << '\n';
       }
 
 
@@ -231,7 +231,7 @@ std::string args_to_string(std::string kernel_name, int kernel_mem_id, std::vect
       case BUFFER: 
       {
         BufferArg *buffer_arg = (BufferArg *) arg; 
-        ss << " b " << buffer_arg->is_in << ' ' << buffer_arg->size << ' ' << buffer_arg->id; //<< std::hex << buffer_arg->ptr << std::dec;
+        ss << " b " << buffer_arg->is_in << ' ' << buffer_arg->id; //<< std::hex << buffer_arg->ptr << std::dec;
         break;
       }
       case VALUE:

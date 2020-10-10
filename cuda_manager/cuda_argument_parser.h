@@ -8,9 +8,9 @@ namespace cuda_manager {
 /*! \brief Parse arguments from a string.
  * The following syntax is required: {kernel_mem_id kernel_name arguments}
  * arguments:
- *    - Buffer: {'b' is_in size ptr} "b {0|1} 2048 0x....."
+ *    - Buffer: {'b' is_in id} "b {0|1} 5"
  *    - Scalar: {value} "23"
- * example: "1 saxpy 2.5 b 1 16384 0x55c6403af910 b 1 4000 0x55c640bba8f0 b 0 4000 0x55c6403c1ee0 4096"
+ * example: "0 saxpy 2.5 b 1 1 b 1 2 b 0 3 4096"
  * \note Allocates memory for kernel_name and parsed_args
  * \return true if successful
  */

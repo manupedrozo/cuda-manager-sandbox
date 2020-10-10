@@ -1,5 +1,5 @@
-#ifndef CUDA_COMMON
-#define CUDA_COMMON
+#ifndef CUDA_COMMON_H
+#define CUDA_COMMON_H
 
 #include <nvrtc.h>
 #include <cuda.h>

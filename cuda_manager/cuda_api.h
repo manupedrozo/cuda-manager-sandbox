@@ -1,3 +1,6 @@
+#ifndef CUDA_API_H
+#define CUDA_API_H
+
 #include "cuda_manager.h"
 
 enum CudaApiExitCode {
@@ -20,3 +23,5 @@ public:
   CudaApiExitCode read_memory(int mem_id, void *dest_buffer, size_t size);
   CudaApiExitCode launch_kernel(char *args, size_t size);
 };
+
+#endif

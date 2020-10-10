@@ -13,6 +13,10 @@ add_executable(launch_kernel_test main.cpp)
 find_library(CUDA_LIBRARY cuda ${CMAKE_CUDA_IMPLICIT_LINK_DIRECTORIES})
 find_library(NVRTC_LIBRARY nvrtc ${CMAKE_CUDA_IMPLICIT_LINK_DIRECTORIES})
 
+message("CUDA_LIBRARY: ${CUDA_LIBRARY}")
+message("NVRTC_LIBRARY: ${NVRTC_LIBRARY}")
+message("Include directories: ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}")
+
 target_link_libraries(launch_kernel_test PRIVATE ${CUDA_LIBRARY} ${NVRTC_LIBRARY} cuda_manager)
 target_link_libraries(cuda_manager PRIVATE ${CUDA_LIBRARY} ${NVRTC_LIBRARY})
 
