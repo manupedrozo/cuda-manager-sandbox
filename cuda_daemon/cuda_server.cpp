@@ -14,7 +14,7 @@ namespace cuda_daemon {
     return response;
   }
 
-  Server::message_result_t handle_memory_allocate_command(int id, const memory_allocate_command_t *cmd, Server &server, CudaServer *cuda_server) {
+  Server::message_result_t CudaServer::handle_memory_allocate_command(int id, const memory_allocate_command_t *cmd, Server &server) {
 
     logger.info("Received: memory allocate command");
 
@@ -23,7 +23,7 @@ namespace cuda_daemon {
     int mem_id = tmp_mem_id++;
     logger.info("mem_id: {}", mem_id);
 
-    CudaApiExitCode err = cuda_server->cuda_api.allocate_memory(mem_id, cmd->size);
+    CudaApiExitCode err = cuda_api.allocate_memory(mem_id, cmd->size);
     if (err != CudaApiExitCode::OK) {
       return {Server::MessageListenerExitCode::OPERATION_ERROR, sizeof(memory_allocate_command_t), 0};
     }
@@ -35,18 +35,18 @@ namespace cuda_daemon {
     return {Server::MessageListenerExitCode::OK, sizeof(memory_allocate_command_t), 0};
   }
 
-  Server::message_result_t handle_memory_write_command(int id, const memory_write_command_t *cmd, Server &server, CudaServer *cuda_server) {
+  Server::message_result_t CudaServer::handle_memory_write_command(int id, const memory_write_command_t *cmd, Server &server) {
     logger.info("Received: memory write command");
 
     server.send_on_socket(id, {create_ack(), sizeof(command_base_t)});
     return {Server::MessageListenerExitCode::OK, sizeof(memory_write_command_t), cmd->size};
   }
 
-  Server::message_result_t handle_memory_read_command(int id, const memory_read_command_t *cmd, Server &server, CudaServer *cuda_server) {
+  Server::message_result_t CudaServer::handle_memory_read_command(int id, const memory_read_command_t *cmd, Server &server) {
     logger.info("Received: memory read command");
 
     void *buffer = malloc(cmd->size);
-    CudaApiExitCode err = cuda_server->cuda_api.read_memory(cmd->mem_id, buffer, cmd->size);
+    CudaApiExitCode err = cuda_api.read_memory(cmd->mem_id, buffer, cmd->size);
 
     if (err != CudaApiExitCode::OK) {
       return {Server::MessageListenerExitCode::OPERATION_ERROR, sizeof(memory_read_command_t), 0};
@@ -56,18 +56,18 @@ namespace cuda_daemon {
     return {Server::MessageListenerExitCode::OK, sizeof(memory_read_command_t), 0};
   }
 
-  Server::message_result_t handle_launch_kernel_command(int id, const launch_kernel_command_t *cmd, Server &server) {
+  Server::message_result_t CudaServer::handle_launch_kernel_command(int id, const launch_kernel_command_t *cmd, Server &server) {
     logger.info("Received: launch kernel command");
     server.send_on_socket(id, {create_ack(), sizeof(command_base_t)});
     return {Server::MessageListenerExitCode::OK, sizeof(launch_kernel_command_t), cmd->size};
   }
 
-  Server::message_result_t handle_variable_length_command(int id, const variable_length_command_t *cmd, Server &server) {
+  Server::message_result_t CudaServer::handle_variable_length_command(int id, const variable_length_command_t *cmd, Server &server) {
     server.send_on_socket(id, {create_ack(), sizeof(command_base_t)});
     return {Server::MessageListenerExitCode::OK, sizeof(variable_length_command_t), cmd->size};
   }
 
-  Server::message_result_t handle_command(int id, Server::message_t msg, Server &server, CudaServer *cuda_server) {
+  Server::message_result_t CudaServer::handle_command(int id, Server::message_t msg, Server &server) {
     logger.info("Handling command");
     if (msg.size < sizeof(command_base_t)) {
       return {Server::MessageListenerExitCode::INSUFFICIENT_DATA, 0, 0}; // Need to read more data to determine a command
@@ -76,17 +76,17 @@ namespace cuda_daemon {
     switch (base->cmd) {
       case MEM_ALLOC:
         if (msg.size >= sizeof(memory_allocate_command_t)) {
-          return handle_memory_allocate_command(id, (memory_allocate_command_t *)  msg.buf, server, cuda_server);
+          return handle_memory_allocate_command(id, (memory_allocate_command_t *)  msg.buf, server);
         }
         break;
       case MEM_WRITE:
         if (msg.size >= sizeof(memory_write_command_t)) {
-          return handle_memory_write_command(id, (memory_write_command_t *)  msg.buf, server, cuda_server);
+          return handle_memory_write_command(id, (memory_write_command_t *)  msg.buf, server);
         }
         break;
       case MEM_READ:
         if (msg.size >= sizeof(memory_read_command_t)) {
-          return handle_memory_read_command(id, (memory_read_command_t *)  msg.buf, server, cuda_server);
+          return handle_memory_read_command(id, (memory_read_command_t *)  msg.buf, server);
         }
         break;
       case LAUNCH_KERNEL:
@@ -107,7 +107,7 @@ namespace cuda_daemon {
     return {Server::MessageListenerExitCode::INSUFFICIENT_DATA, 0, 0};
   }
 
-  void handle_data(int id, Server::packet_t packet, Server &server, CudaServer *cuda_server) {
+  void CudaServer::handle_data(int id, Server::packet_t packet, Server &server) {
     logger.info("Received data, size: {}", packet.extra_data.size);
 
     command_base_t *base = (command_base_t *) packet.msg.buf;
@@ -115,7 +115,7 @@ namespace cuda_daemon {
       case MEM_WRITE: {
         memory_write_command_t *command = (memory_write_command_t *) base;
 
-        CudaApiExitCode err = cuda_server->cuda_api.write_memory(command->mem_id, packet.extra_data.buf, command->size);
+        CudaApiExitCode err = cuda_api.write_memory(command->mem_id, packet.extra_data.buf, command->size);
         // @TODO there is no data error handling in the server yet
         assert(err == OK && "Write memory error");
 
@@ -124,7 +124,7 @@ namespace cuda_daemon {
       case LAUNCH_KERNEL: {
         launch_kernel_command_t *command = (launch_kernel_command_t *) base;
 
-        CudaApiExitCode err = cuda_server->cuda_api.launch_kernel((char *) packet.extra_data.buf, packet.extra_data.size);
+        CudaApiExitCode err = cuda_api.launch_kernel((char *) packet.extra_data.buf, packet.extra_data.size);
 
         // @TODO there is no data error handling in the server yet
         assert(err == OK && "Kernel launch error");
@@ -146,18 +146,18 @@ namespace cuda_daemon {
 
   CudaServer::CudaServer(const char *socket_path) : 
     server(socket_path, 10,
-        [&](int id, Server::message_t msg, Server &server) { return handle_command(id, msg, server, this); },
-        [&](int id, Server::packet_t packet, Server &server) { return handle_data(id, packet, server, this); }
+        [this](int id, Server::message_t msg, Server &server) { return this->handle_command(id, msg, server); },
+        [this](int id, Server::packet_t packet, Server &server) { return this->handle_data(id, packet, server); }
         ), 
     cuda_api() {
 
       logger.info("Cuda server starting...");
-      Server::InitExitCode err = this->server.initialize();
+      Server::InitExitCode err = server.initialize();
       if (err != Server::InitExitCode::OK) {
         logger.error("Cuda server initialization error");
         exit(EXIT_FAILURE);
       }
-      this->server.start();
+      server.start();
     }
 
   CudaServer::~CudaServer() {}
