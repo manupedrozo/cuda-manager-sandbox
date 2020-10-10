@@ -11,5 +11,6 @@ Installation:
 - cd cuda-manager-sandbox
 - mkdir build
 - cd build
-- cmake .. [-DNO_INSTALL=true]
+- cmake ..
 - make
+- sudo make install
