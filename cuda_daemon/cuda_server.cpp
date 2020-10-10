@@ -18,10 +18,9 @@ namespace cuda_daemon {
 
     logger.info("Received: memory allocate command");
 
-    // @TODO temporal while we decide if we receive the id or address in the comand
+    // @TODO temporal while we decide if we receive the id or address in the command
     static int tmp_mem_id = 0;
     int mem_id = tmp_mem_id++;
-    logger.info("mem_id: {}", mem_id);
 
     CudaApiExitCode err = cuda_api.allocate_memory(mem_id, cmd->size);
     if (err != CudaApiExitCode::OK) {
