@@ -9,6 +9,7 @@ Sandbox for a system that:
 Installation:
 - clone
 - cd cuda-manager-sandbox
+- ./setup.sh
 - mkdir build
 - cd build
 - cmake ..
