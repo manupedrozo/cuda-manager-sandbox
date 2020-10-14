@@ -1,0 +1,3 @@
+[submodule "cuda_daemon/external/spdlog"]
+	path = cuda_daemon/external/spdlog
+	url = https://github.com/gabime/spdlog.git

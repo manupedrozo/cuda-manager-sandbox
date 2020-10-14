@@ -21,8 +21,6 @@ set(KILLER_SRC test/killer.cpp)
 
 set(COMMON_HEADERS commands.h)
 
-find_package(spdlog REQUIRED)
-
 add_executable(server ${SERVER_SRC})
 add_executable(client ${CLIENT_1_SRC})
 add_executable(client-continous ${CLIENT_2_SRC})
@@ -52,3 +50,5 @@ configure_file(saxpy.cu saxpy.cu COPYONLY)
 
 install(TARGETS cuda-server 
   RUNTIME DESTINATION ${MANGO_ROOT}/bin)
+
+add_subdirectory(external/spdlog)
