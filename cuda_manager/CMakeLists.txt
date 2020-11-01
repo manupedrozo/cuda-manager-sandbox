@@ -5,6 +5,7 @@ project(cuda_sandbox LANGUAGES CXX CUDA)
 set(MANGO_ROOT /opt/mango)
 set(LIB_DIR ${MANGO_ROOT}/lib/cuda_manager)
 set(INCLUDE_DIR ${MANGO_ROOT}/include/cuda_manager)
+set(EXPORT_DIR ${MANGO_ROOT}/lib/cmake/cuda_manager)
 
 set(SOURCES cuda_manager.cpp cuda_compiler.cpp cuda_argument_parser.cpp cuda_memory_manager.cpp cuda_api.cpp)
 set(HEADERS cuda_common.h cuda_argument_parser.h cuda_compiler.h cuda_manager.h cuda_memory_manager.h cuda_api.h kernel_arguments.h)
@@ -29,8 +30,10 @@ target_include_directories(cuda_manager PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
     $<INSTALL_INTERFACE:${INCLUDE_DIR}>)
 
-install(TARGETS cuda_manager LIBRARY DESTINATION ${LIB_DIR})
+install(TARGETS cuda_manager EXPORT cuda_managerConfig LIBRARY DESTINATION ${LIB_DIR})
 
 install(FILES ${HEADERS} DESTINATION ${INCLUDE_DIR})
+
+install(EXPORT cuda_managerConfig DESTINATION ${EXPORT_DIR})
 
 configure_file(saxpy.cu saxpy.cu COPYONLY)

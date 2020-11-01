@@ -51,7 +51,7 @@ MemoryBuffer CudaMemoryManager::get_buffer(int id) {
   return it->second;
 }
 
-void CudaMemoryManager::write_buffer(int id, void *data, size_t size) {
+void CudaMemoryManager::write_buffer(int id, const void *data, size_t size) {
   MemoryBuffer buffer = get_buffer(id);
 
   assert(size <= buffer.size && "Data size is greater than buffer size");

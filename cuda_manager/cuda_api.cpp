@@ -19,7 +19,7 @@ CudaApiExitCode CudaApi::release_memory(int mem_id) {
   return OK;
 }
 
-CudaApiExitCode CudaApi::write_memory(int mem_id, void *data, size_t size) {
+CudaApiExitCode CudaApi::write_memory(int mem_id, const void *data, size_t size) {
   memory_manager.write_buffer(mem_id, data, size);
   return OK;
 }
@@ -32,7 +32,7 @@ CudaApiExitCode CudaApi::read_memory(int mem_id, void *dest_buffer, size_t size)
 
 // @TODO arguments may need change
 // kernel_mem_id wont be in args any more but as a function arg
-CudaApiExitCode CudaApi::launch_kernel(char *args, size_t size) {
+CudaApiExitCode CudaApi::launch_kernel(const char *args, size_t size) {
   char *kernel_name;
 
   int kernel_mem_id;
