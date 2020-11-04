@@ -2,6 +2,12 @@ cmake_minimum_required (VERSION 2.8.11)
 
 project(cuda_sandbox LANGUAGES CXX CUDA)
 
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE Debug)
+endif(NOT CMAKE_BUILD_TYPE)
+
+message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
+
 set(MANGO_ROOT /opt/mango)
 set(LIB_DIR ${MANGO_ROOT}/lib/cuda_manager)
 set(INCLUDE_DIR ${MANGO_ROOT}/include/cuda_manager)

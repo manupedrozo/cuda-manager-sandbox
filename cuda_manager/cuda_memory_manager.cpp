@@ -10,7 +10,7 @@ void CudaMemoryManager::allocate_buffer(int id, size_t size, void **result_ptr) 
 
   buffer_count = id + 1;
 
-  printf("[Memory manager] Allocated %zu bytes\n", size);
+  printf("[Memory manager] Allocated %zu bytes at %p\n", size, ptr);
 
   MemoryBuffer buffer = { id, size, ptr };
   buffers.emplace(id, buffer);
@@ -53,9 +53,11 @@ MemoryBuffer CudaMemoryManager::get_buffer(int id) {
 
 void CudaMemoryManager::write_buffer(int id, const void *data, size_t size) {
   MemoryBuffer buffer = get_buffer(id);
-
   assert(size <= buffer.size && "Data size is greater than buffer size");
 
+  printf("[Memory manager] Writing at buffer id %d \n", id);
+  printf("[Memory manager] Writing %zu bytes from %p to %p\n", size, data, buffer.ptr);
+  printf("[Memory manager] Buffer size: %zu, id %d, ptr %p\n", buffer.size, buffer.id, buffer.ptr);
   memcpy(buffer.ptr, data, size);
 }
 
