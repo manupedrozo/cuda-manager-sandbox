@@ -15,19 +15,21 @@ struct MemoryBuffer {
 
 class CudaMemoryManager {
 private:
+  // Separating kernels from buffers to allow for overlapping ids
+  std::map<int, MemoryBuffer> kernels;
   std::map<int, MemoryBuffer> buffers;
-  int buffer_count = 0;
+  int next_id = 0;
 
 public:
   CudaMemoryManager() {}
   ~CudaMemoryManager() {}
 
-  int allocate_buffer(size_t size, void **result_ptr = nullptr);
-  void allocate_buffer(int id, size_t size, void **result_ptr = nullptr);
-  void deallocate_buffer(int id);
-  MemoryBuffer get_buffer(int id);
-  void write_buffer(int id, const void *data, size_t size);
-  void read_buffer(int id, void *buf, size_t size);
+  void allocate_buffer(int id, size_t size, bool is_kernel, void **result_ptr = nullptr);
+  int allocate_buffer(size_t size, bool is_kernel, void **result_ptr = nullptr);
+  void deallocate_buffer(int id, bool is_kernel);
+  MemoryBuffer get_buffer(int id, bool is_kernel);
+  void write_buffer(int id, const void *data, size_t size, bool is_kernel);
+  void read_buffer(int id, void *buf, size_t size, bool is_kernel);
 };
 
 }

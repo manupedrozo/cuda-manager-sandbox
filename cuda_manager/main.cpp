@@ -21,142 +21,6 @@ const char *PTX_PATH        = "saxpy";
 using namespace cuda_manager;
 
 /*
-// Requires compiled ptx
-void test_arg_parser() {
-  CudaManager cuda_manager;
-
-  // Setup input and output buffers
-  size_t n = NUM_THREADS * NUM_BLOCKS;
-  size_t buffer_size = n * sizeof(float);
-
-  // Allocate and write buffers
-  float *x, *y, *o;
-  int xid = cuda_manager.memory_manager.allocate_buffer(buffer_size, (void **) &x);
-  int yid = cuda_manager.memory_manager.allocate_buffer(buffer_size, (void **) &y);
-  int oid = cuda_manager.memory_manager.allocate_buffer(buffer_size, (void **) &o);
-  printf("Allocated buffer x id: %d, ptr: %p\n", xid, x);
-  printf("Allocated buffer y id: %d, ptr: %p\n", yid, y);
-  printf("Allocated buffer o id: %d, ptr: %p\n", oid, o);
-
-  float a = 2.5f;
-  
-  for (size_t i = 0; i < n; ++i) {
-    x[i] = static_cast<float>(i);
-    y[i] = static_cast<float>(i * 2);
-  }
-
-  ValueArg<float>  arg_a(a, sizeof(float), true);
-  BufferArg arg_x(xid, buffer_size, true);
-  BufferArg arg_y(yid, buffer_size, true);
-  BufferArg arg_o(oid, buffer_size, false);
-  ValueArg<float> arg_n(n, sizeof(float), true);
-
-  std::vector<Arg *> args {&arg_a, &arg_x, &arg_y, &arg_o, &arg_n};
-
-  // Arguments to a string
-  int kernel_mem_id = 0; // Not using this, we are manually handling memory
-  std::cout << "Arguments to string: \n";
-  std::string _arguments = args_to_string(KERNEL_NAME, kernel_mem_id, args);
-  const char *arguments = _arguments.c_str();
-
-  // Parse arguments back from the string
-  std::vector<Arg *> parsed_args;
-  char *kernel_name;
-  bool succ = parse_arguments(arguments, parsed_args, &kernel_mem_id, &kernel_name);
-
-  if (!succ) {
-    exit(1);
-  }
-
-  //std::cout << "Parsed arguments from string kernel [" << kernel_name << "]: \n";
-  //print_args(parsed_args);
-
-  // Get ptx and kernel handle
-  CudaCompiler cuda_compiler;
-  char *ptx = cuda_compiler.read_ptx_from_file(PTX_PATH);
-
-  CUmodule module;
-  CUfunction kernel;
-  CUDA_SAFE_CALL(cuModuleLoadDataEx(&module, ptx, 0, 0, 0));
-  CUDA_SAFE_CALL(cuModuleGetFunction(&kernel, module, kernel_name));
-
-  // Free PTX and kernel_name_
-  delete[] kernel_name;
-  delete[] ptx;
-
-  // Launch kernel with parsed arguments
-  cuda_manager.launch_kernel(kernel, parsed_args, NUM_BLOCKS, NUM_THREADS);
-
-  for (size_t i = 0; i < 10; ++i) { // first 10 results only
-    std::cout << a << " * " << x[i] << " + " << y[i] << " = " << o[i] << '\n';
-  }
-
-  // Free resources
-  for (Arg *arg : parsed_args) { free(arg); }
-  CUDA_SAFE_CALL(cuModuleUnload(module));
-  delete[] x;
-  delete[] y;
-  delete[] o;
-}
-
-void manager_launch_kernel_test() {
-  CudaManager cuda_manager;
-
-  // Compile and get a kernel handle
-  CudaCompiler cuda_compiler;
-  char *ptx;
-  size_t ptx_size;
-  cuda_compiler.compile_to_ptx(KERNEL_PATH, &ptx, &ptx_size);
-
-  CUmodule module;
-  CUfunction kernel;
-  CUDA_SAFE_CALL(cuModuleLoadDataEx(&module, ptx, 0, 0, 0));
-  CUDA_SAFE_CALL(cuModuleGetFunction(&kernel, module, KERNEL_NAME));
-
-  // Free PTX
-  delete[] ptx;
-
-  // Setup input and output buffers
-  size_t n = NUM_THREADS * NUM_BLOCKS;
-  size_t buffer_size = n * sizeof(float);
-
-  // Allocate and write buffers
-  float *x, *y, *o;
-  int xid = cuda_manager.memory_manager.allocate_buffer(buffer_size, (void **) &x);
-  int yid = cuda_manager.memory_manager.allocate_buffer(buffer_size, (void **) &y);
-  int oid = cuda_manager.memory_manager.allocate_buffer(buffer_size, (void **) &o);
-  printf("Allocated buffer x id: %d\n", xid);
-  printf("Allocated buffer y id: %d\n", yid);
-  printf("Allocated buffer o id: %d\n", oid);
-
-  float a = 2.5f;
-  
-  for (size_t i = 0; i < n; ++i) {
-    x[i] = static_cast<float>(i);
-    y[i] = static_cast<float>(i * 2);
-  }
-
-  ValueArg<float>  arg_a(a, sizeof(float), true);
-  BufferArg arg_x(xid, buffer_size, true);
-  BufferArg arg_y(yid, buffer_size, true);
-  BufferArg arg_o(oid, buffer_size, false);
-  ValueArg<float> arg_n(n, sizeof(float), true);
-
-  std::vector<Arg *> args {&arg_a, &arg_x, &arg_y, &arg_o, &arg_n};
-
-  cuda_manager.launch_kernel(kernel, args, NUM_BLOCKS, NUM_THREADS);
-
-  for (size_t i = 0; i < 10; ++i) { // first 10 results only
-    std::cout << a << " * " << x[i] << " + " << y[i] << " = " << o[i] << '\n';
-  }
-
-  // Free resources
-  CUDA_SAFE_CALL(cuModuleUnload(module));
-  delete[] x;
-  delete[] y;
-  delete[] o;
-}
-
 void manual_launch_kernel_test() {
   // Initialize cuda manager and compiler
   CudaManager cuda_manager;
@@ -240,8 +104,8 @@ void test_api() {
 
   // Allocate and write ptx
   int kernel_mem_id = 0;
-  cuda_api.allocate_memory(kernel_mem_id, ptx_size);
-  cuda_api.write_memory(kernel_mem_id, (void *) ptx, ptx_size);
+  cuda_api.allocate_kernel(kernel_mem_id, ptx_size);
+  cuda_api.write_kernel(kernel_mem_id, (void *) ptx, ptx_size);
 
   delete[] ptx;
 
@@ -257,9 +121,9 @@ void test_api() {
   }
 
   // Allocate and write buffers
-  int xid = 1;
-  int yid = 2;
-  int oid = 3;
+  int xid = 0;
+  int yid = 1;
+  int oid = 2;
   cuda_api.allocate_memory(xid, buffer_size);
   cuda_api.allocate_memory(yid, buffer_size);
   cuda_api.allocate_memory(oid, buffer_size);
@@ -304,7 +168,5 @@ void test_api() {
 
 int main(void) {
   test_api();
-  //test_arg_parser();
-  //manager_launch_kernel_test();
   //manual_launch_kernel_test();
 }

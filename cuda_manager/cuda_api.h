@@ -17,10 +17,14 @@ public:
   CudaApi();
   ~CudaApi();
 
-  CudaApiExitCode allocate_memory(int mem_id, size_t size);
-  CudaApiExitCode release_memory(int mem_id);
-  CudaApiExitCode write_memory(int mem_id, const void *data, size_t size);
-  CudaApiExitCode read_memory(int mem_id, void *dest_buffer, size_t size);
+  CudaApiExitCode allocate_memory(int buffer_id, size_t size);
+  CudaApiExitCode deallocate_memory(int buffer_id);
+  CudaApiExitCode write_memory(int buffer_id, const void *data, size_t size);
+  CudaApiExitCode read_memory(int buffer_id, void *dest_buffer, size_t size);
+
+  CudaApiExitCode allocate_kernel(int kernel_id, size_t size);
+  CudaApiExitCode deallocate_kernel(int kernel_id);
+  CudaApiExitCode write_kernel(int kernel_id, const void *data, size_t size);
   CudaApiExitCode launch_kernel(const char *args, size_t size);
 };
 

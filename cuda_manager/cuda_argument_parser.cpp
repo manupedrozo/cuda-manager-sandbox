@@ -89,7 +89,7 @@ bool parse_integer(int *position, const char *arguments, int *result) {
 }
 
 // @TODO receive size to not depend on correctly terminated strings
-bool parse_arguments(const char *arguments, char **parsed_args, int *arg_count, int *kernel_mem_id, char **kernel_name, CudaMemoryManager *memory_manager) {
+bool parse_arguments(const char *arguments, char **parsed_args, int *arg_count, int *kernel_id, char **kernel_name, CudaMemoryManager *memory_manager) {
   std::cout << "Parsing arguments: " << arguments << '\n';
 
   // Allocate memory for arguments
@@ -106,7 +106,7 @@ bool parse_arguments(const char *arguments, char **parsed_args, int *arg_count, 
   bool is_number;
 
   // Kernel mem_id
-  parse_correct = parse_integer(&i, arguments, kernel_mem_id);
+  parse_correct = parse_integer(&i, arguments, kernel_id);
   if (!parse_correct) {
     std::cerr << "Error: number expected (kernel mem_id)\n";
     return false;
@@ -139,26 +139,6 @@ bool parse_arguments(const char *arguments, char **parsed_args, int *arg_count, 
           return false;
         }
 
-        /* Size, no longer required
-        int size;
-        parse_correct = parse_integer(&(++i), arguments, &size);
-        if (!parse_correct) {
-          std::cerr << "Error: number expected (buffer size)\n";
-          return false;
-        }
-        */
-
-        /* Not a ptr any more
-        // Ptr
-        void *ptr;
-        parse_correct = parse_pointer(&(++i), arguments, &ptr, true);
-
-        Arg *arg = new BufferArg(ptr, (size_t)size, is_in);
-        args.push_back(arg);
-
-        std::cout << "Buffer: is_in = " << is_in << " size = " << size << " ptr = " << ptr << '\n';
-        */
-
         // Id
         int id;
         parse_correct = parse_integer(&(++i), arguments, &id);
@@ -174,7 +154,7 @@ bool parse_arguments(const char *arguments, char **parsed_args, int *arg_count, 
         }
 
         // @TODO error if not found
-        MemoryBuffer memory_buffer = memory_manager->get_buffer(id);
+        MemoryBuffer memory_buffer = memory_manager->get_buffer(id, false);
 
         BufferArg *arg = (BufferArg *)args;
         *arg = {BUFFER, memory_buffer.ptr, id, memory_buffer.size, is_in};
@@ -220,9 +200,9 @@ bool parse_arguments(const char *arguments, char **parsed_args, int *arg_count, 
 }
 
 // Receiving a void * vector here since we only use this for testing and makes it easy for the test.
-std::string args_to_string(std::string kernel_name, int kernel_mem_id, std::vector<void *> args) {
+std::string args_to_string(std::string kernel_name, int kernel_id, std::vector<void *> args) {
 	std::stringstream ss;
-  ss << kernel_mem_id;
+  ss << kernel_id;
   ss << " " << kernel_name;
 
   for (void *arg: args) {
