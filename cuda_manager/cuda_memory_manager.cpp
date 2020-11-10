@@ -75,9 +75,17 @@ void CudaMemoryManager::write_buffer(int id, const void *data, size_t size, bool
   MemoryBuffer mem_buffer = get_buffer(id, is_kernel);
   assert(size <= mem_buffer.size && "Data size is greater than buffer size");
 
-  printf("[Memory manager] Writing at buffer id %d \n", id);
-  printf("[Memory manager] Writing %zu bytes from %p to %p\n", size, data, mem_buffer.ptr);
-  printf("[Memory manager] Buffer size: %zu, id %d, ptr %p\n", mem_buffer.size, mem_buffer.id, mem_buffer.ptr);
+  if (is_kernel) {
+    printf("[Memory manager] Writing %zu bytes at kernel id %d \n", size, id);
+    printf("[Memory manager] Writing from %p to %p\n", data, mem_buffer.ptr);
+    printf("[Memory manager] Buffer size: %zu, id %d, ptr %p\n", mem_buffer.size, mem_buffer.id, mem_buffer.ptr);
+  }
+  else {
+    printf("[Memory manager] Writing %zu bytes at buffer id %d \n", size, id);
+    printf("[Memory manager] Writing from %p to %p\n", data, mem_buffer.ptr);
+    printf("[Memory manager] Buffer size: %zu, id %d, ptr %p\n", mem_buffer.size, mem_buffer.id, mem_buffer.ptr);
+  }
+  
   memcpy(mem_buffer.ptr, data, size);
 }
 

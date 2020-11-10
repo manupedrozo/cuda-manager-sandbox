@@ -112,11 +112,15 @@ bool parse_arguments(const char *arguments, char **parsed_args, int *arg_count, 
     return false;
   }
 
+  std::cout << "Kernel id: " << kernel_id << '\n';
+
   // Kernel name
   std::string kernel_name_s = parse_next(&(++i), arguments, nullptr);
   size_t kernel_name_size = sizeof(char) * (kernel_name_s.size() + 1);
   *kernel_name = (char *) malloc(kernel_name_size);
   strncpy(*kernel_name, kernel_name_s.c_str(), kernel_name_s.size() + 1);
+
+  std::cout << "Kernel name: " << kernel_name_s << '\n';
 
   // Rest of the arguments
   char c = arguments[i];
@@ -129,6 +133,8 @@ bool parse_arguments(const char *arguments, char **parsed_args, int *arg_count, 
 
       // Buffer
       if (current_arg == "b") {
+        std::cout << "Parsing buffer..." << '\n';
+
         current_arg.clear();
 
         // In/out
@@ -152,6 +158,8 @@ bool parse_arguments(const char *arguments, char **parsed_args, int *arg_count, 
           std::cerr << "Ran out of memory for arguments\n";
           return false;
         }
+
+        std::cout << "Looking for buffer id: " << id << "..." << '\n';
 
         // @TODO error if not found
         MemoryBuffer memory_buffer = memory_manager->get_buffer(id, false);

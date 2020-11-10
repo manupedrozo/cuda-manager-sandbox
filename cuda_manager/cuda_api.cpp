@@ -61,6 +61,10 @@ CudaApiExitCode CudaApi::launch_kernel(const char *args, size_t size) {
 
   // Launch kernel
   // @TODO change fixed blocks/threads
+
+  std::cout << "Launching kernel from ptx: \n" << ptx << "\n";
+  std::cout << "Kernel name " << kernel_name << "\n";
+  std::cout << "Number of arguments: " << args_count << "\n";
   cuda_manager.launch_kernel_from_ptx(ptx, kernel_name, parsed_args, args_count, 32, 128);
 
   // Free stuff
