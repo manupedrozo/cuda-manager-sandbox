@@ -87,11 +87,12 @@ char *CudaCompiler::read_ptx_from_file(const char *ptx_path) {
   }
 
   size_t input_size = (size_t)input_file.tellg();
-  char *ptx = new char[input_size];
+  char *ptx = new char[input_size + 1];
 
   input_file.seekg(0, std::ifstream::beg);
   input_file.read(ptx, input_size);
   input_file.close();
+  ptx[input_size] = '\0';
 
   return ptx;
 }
