@@ -89,7 +89,7 @@ bool parse_integer(int *position, const char *arguments, int *result) {
 }
 
 // @TODO receive size to not depend on correctly terminated strings
-bool parse_arguments(const char *arguments, char **parsed_args, int *arg_count, int *kernel_id, char **kernel_name, CudaMemoryManager *memory_manager) {
+bool parse_arguments(const char *arguments, char **parsed_args, int *arg_count, int *kernel_id, char **function_name) {
   std::cout << "Parsing arguments: " << arguments << '\n';
 
   // Allocate memory for arguments
@@ -115,12 +115,12 @@ bool parse_arguments(const char *arguments, char **parsed_args, int *arg_count, 
   std::cout << "Kernel id: " << kernel_id << '\n';
 
   // Kernel name
-  std::string kernel_name_s = parse_next(&(++i), arguments, nullptr);
-  size_t kernel_name_size = sizeof(char) * (kernel_name_s.size() + 1);
-  *kernel_name = (char *) malloc(kernel_name_size);
-  strncpy(*kernel_name, kernel_name_s.c_str(), kernel_name_s.size() + 1);
+  std::string function_name_s = parse_next(&(++i), arguments, nullptr);
+  size_t function_name_size = sizeof(char) * (function_name_s.size() + 1);
+  *function_name = (char *) malloc(function_name_size);
+  strncpy(*function_name, function_name_s.c_str(), function_name_s.size() + 1);
 
-  std::cout << "Kernel name: " << kernel_name_s << '\n';
+  std::cout << "Function name: " << function_name_s << '\n';
 
   // Rest of the arguments
   char c = arguments[i];
@@ -159,13 +159,8 @@ bool parse_arguments(const char *arguments, char **parsed_args, int *arg_count, 
           return false;
         }
 
-        std::cout << "Looking for buffer id: " << id << "..." << '\n';
-
-        // @TODO error if not found
-        MemoryBuffer memory_buffer = memory_manager->get_buffer(id, false);
-
         BufferArg *arg = (BufferArg *)args;
-        *arg = {BUFFER, memory_buffer.ptr, id, memory_buffer.size, is_in};
+        *arg = {BUFFER, id, is_in};
         ++args_count;
         args_size = new_args_size;
         args += sizeof(BufferArg);
@@ -208,10 +203,10 @@ bool parse_arguments(const char *arguments, char **parsed_args, int *arg_count, 
 }
 
 // Receiving a void * vector here since we only use this for testing and makes it easy for the test.
-std::string args_to_string(std::string kernel_name, int kernel_id, std::vector<void *> args) {
-	std::stringstream ss;
+std::string args_to_string(std::string function_name, int kernel_id, std::vector<void *> args) {
+  std::stringstream ss;
   ss << kernel_id;
-  ss << " " << kernel_name;
+  ss << " " << function_name;
 
   for (void *arg: args) {
     Arg *base = (Arg *) arg; 

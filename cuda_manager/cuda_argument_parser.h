@@ -14,7 +14,7 @@ namespace cuda_manager {
  * \note Allocates memory for kernel_name and parsed_args
  * \return true if successful
  */
-bool parse_arguments(const char *arguments, char **parsed_args, int *arg_count, int *kernel_mem_id, char **kernel_name, CudaMemoryManager *memory_manager);
+bool parse_arguments(const char *arguments, char **parsed_args, int *arg_count, int *kernel_mem_id, char **kernel_name);
 
 std::string args_to_string(std::string kernel_name, int kernel_mem_id, std::vector<void *> args);
 void print_args(std::vector<void *> args);

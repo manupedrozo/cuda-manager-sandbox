@@ -7,7 +7,7 @@
 
 namespace cuda_manager {
 
-CudaManager::CudaManager() : memory_manager() {
+CudaManager::CudaManager(): memory_manager() {
   std::cout << "Initializing CUDA Manager...\n";
   CUDA_SAFE_CALL(cuInit(0));
 
@@ -42,7 +42,7 @@ CudaManager::~CudaManager() {
 }
 
 
-void CudaManager::launch_kernel_from_ptx(const char *ptx, const char* function_name, char *args, int arg_count, const uint32_t num_blocks, const uint32_t num_threads) {
+void CudaManager::launch_kernel_from_ptx(const char *ptx, const char* function_name, const char *args, int arg_count, const uint32_t num_blocks, const uint32_t num_threads) {
   // Set context where to launch the kernel
   CUDA_SAFE_CALL(cuCtxSetCurrent(contexts[0])); // TODO just using one context for now
 
@@ -60,13 +60,13 @@ void CudaManager::launch_kernel_from_ptx(const char *ptx, const char* function_n
 }
 
 
-void CudaManager::launch_kernel(const CUfunction kernel, char *args, int arg_count, const uint32_t num_blocks, const uint32_t num_threads) {
+void CudaManager::launch_kernel(const CUfunction kernel, const char *args, int arg_count, const uint32_t num_blocks, const uint32_t num_threads) {
   void *kernel_args[arg_count]; // Args to be passed on kernel launch
   std::vector<CudaBuffer> buffers; // Keep track of buffers 
 
   std::cout << "Parsing arguments...\n";
 
-  char *current_arg = args;
+  const char *current_arg = args;
   for (int i = 0; i < arg_count; ++i) {
     Arg *base = (Arg *) current_arg;
 
@@ -82,8 +82,11 @@ void CudaManager::launch_kernel(const CUfunction kernel, char *args, int arg_cou
         buffers.push_back(CudaBuffer());
         CudaBuffer &cuda_buffer = buffers[buffers.size() - 1];
 
-        cuda_buffer.h_ptr = arg->ptr;
-        cuda_buffer.size  = arg->size;
+        // Get memory buffer by id
+        MemoryBuffer memory_buffer = memory_manager.get_buffer(arg->id, false);
+
+        cuda_buffer.h_ptr = memory_buffer.ptr;
+        cuda_buffer.size  = memory_buffer.size;
         cuda_buffer.is_in = arg->is_in;
 
         CUDA_SAFE_CALL(cuMemAlloc(&cuda_buffer.d_ptr, cuda_buffer.size));
@@ -94,8 +97,8 @@ void CudaManager::launch_kernel(const CUfunction kernel, char *args, int arg_cou
           "  d_ptr = " << cuda_buffer.d_ptr << "\n";
 
         if (cuda_buffer.is_in) {
-          std::cout << "Copied HtoD " << cuda_buffer.h_ptr << " to " << cuda_buffer.d_ptr << "\n";
           CUDA_SAFE_CALL(cuMemcpyHtoD(cuda_buffer.d_ptr, cuda_buffer.h_ptr, cuda_buffer.size));
+          std::cout << "Copied HtoD " << cuda_buffer.h_ptr << " to " << cuda_buffer.d_ptr << "\n";
         }
 
         kernel_args[i] = (void *) &cuda_buffer.d_ptr;

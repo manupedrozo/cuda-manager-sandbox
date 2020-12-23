@@ -32,10 +32,10 @@ public:
   ~CudaManager();
   
   // Load kernel from a ptx and function name
-  void launch_kernel_from_ptx(const char *ptx, const char* function_name, char *args, int arg_count, const uint32_t num_blocks, const uint32_t num_threads);
+  void launch_kernel_from_ptx(const char *ptx, const char* function_name, const char *args, int arg_count, const uint32_t num_blocks, const uint32_t num_threads);
 
   // Careful! this function will launch a kernel in the current context, if you are not manually managing contexts, do not use this function directly
-  void launch_kernel(const CUfunction kernel, char *args, int arg_count, const uint32_t num_blocks, const uint32_t num_threads);
+  void launch_kernel(const CUfunction kernel, const char *args, int arg_count, const uint32_t num_blocks, const uint32_t num_threads);
 };
 
 }

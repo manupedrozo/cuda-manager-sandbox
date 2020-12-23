@@ -21,9 +21,7 @@ struct ValueArg {
 
 struct BufferArg {
   ArgType type;
-  void *ptr;
   int id;
-  size_t size;
   bool is_in;
 };
 

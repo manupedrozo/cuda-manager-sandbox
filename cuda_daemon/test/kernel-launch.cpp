@@ -28,6 +28,7 @@ int main(int argc, char const *argv[]) {
 
   // Send ptx and get mem_id handle
   int kernel_mem_id;
+  // TODO this should be a kernel allocation, not a memory allocation, not currently implemented in client/server
   client.memory_allocate(ptx_size, &kernel_mem_id);
   client.memory_write(kernel_mem_id, (void *) ptx, ptx_size);
 
@@ -58,9 +59,9 @@ int main(int argc, char const *argv[]) {
 
   // Doing it this way to easily convert them to string, in reality you need to manually create the string
   ValueArg  arg_a = {VALUE, a};
-  BufferArg arg_x = {BUFFER, nullptr, xid, buffer_size, true};
-  BufferArg arg_y = {BUFFER, nullptr, yid, buffer_size, true};
-  BufferArg arg_o = {BUFFER, nullptr, oid, buffer_size, false};
+  BufferArg arg_x = {BUFFER, xid, true};
+  BufferArg arg_y = {BUFFER, yid, true};
+  BufferArg arg_o = {BUFFER, oid, false};
   ValueArg  arg_n = {VALUE, (float)n};
 
   std::vector<void *> args {(void *)&arg_a, (void *)&arg_x, (void *)&arg_y, (void *)&arg_o, (void *)&arg_n};
@@ -81,6 +82,8 @@ int main(int argc, char const *argv[]) {
   for (size_t i = 0; i < 10; ++i) { // first 10 results only
     std::cout << a << " * " << x[i] << " + " << y[i] << " = " << o[i] << '\n';
   }
+
+  // TODO deallocate kernel and buffers, currently not implemented
 
   delete[] x;
   delete[] y;
