@@ -2,11 +2,12 @@ cmake_minimum_required (VERSION 2.8.11)
 
 project(cuda_sandbox LANGUAGES CXX CUDA)
 
-# if(NOT CMAKE_BUILD_TYPE)
-#     set(CMAKE_BUILD_TYPE Debug)
-# endif(NOT CMAKE_BUILD_TYPE)
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE "Debug" CACHE STRING "Choose debug or release" FORCE)
+endif(NOT CMAKE_BUILD_TYPE)
 
-message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
+message(STATUS "[Manager] Generated with config types: ${CMAKE_CONFIGURATION_TYPES}")
+message(STATUS "[Manager] Build type: ${CMAKE_BUILD_TYPE}")
 
 set(MANGO_ROOT /opt/mango)
 set(LIB_DIR ${MANGO_ROOT}/lib/cuda_manager)
@@ -36,7 +37,12 @@ target_include_directories(cuda_manager PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
     $<INSTALL_INTERFACE:${INCLUDE_DIR}>)
 
-install(TARGETS cuda_manager EXPORT cuda_managerConfig LIBRARY DESTINATION ${LIB_DIR})
+install(
+    TARGETS cuda_manager 
+    EXPORT cuda_managerConfig 
+    LIBRARY 
+    DESTINATION ${LIB_DIR}
+)
 
 install(FILES ${HEADERS} DESTINATION ${INCLUDE_DIR})
 
