@@ -78,13 +78,8 @@ void CudaManager::launch_kernel(const CUfunction kernel, const char *args, int a
 
         std::cout << "Buffer arg[1/2]: id = " << arg->id << "  is_in = " << arg->is_in << "\n";
 
-        // Create cuda buffer and copy to device if its an input buffer
-        // The buffer must be created inside the vector and then used as a reference
-        // This allows us to use pointers to its members (d_ptr)
-
-        CudaBuffer *cuda_buffer = new CudaBuffer();
+        CudaBuffer *cuda_buffer = new CudaBuffer;
         buffers.push_back(cuda_buffer);
-
 
         // Get memory buffer by id
         MemoryBuffer memory_buffer = memory_manager.get_buffer(arg->id, false);
@@ -147,7 +142,7 @@ void CudaManager::launch_kernel(const CUfunction kernel, const char *args, int a
     }
     std::cout << "Deallocated " << cuda_buffer->d_ptr << "\n";
     CUDA_SAFE_CALL(cuMemFree(cuda_buffer->d_ptr));
-    free(cuda_buffer);
+    delete cuda_buffer;
   }
 }
 
