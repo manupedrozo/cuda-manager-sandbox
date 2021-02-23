@@ -20,7 +20,6 @@ const char *PTX_PATH        = "saxpy";
 
 using namespace cuda_manager;
 
-/*
 void manual_launch_kernel_test() {
   // Initialize cuda manager and compiler
   CudaManager cuda_manager;
@@ -91,7 +90,6 @@ void manual_launch_kernel_test() {
   delete[] hY;
   delete[] hOut;
 }
-*/
 
 void test_api_string_args() {
   CudaApi cuda_api;
