@@ -49,3 +49,12 @@ install(FILES ${HEADERS} DESTINATION ${INCLUDE_DIR})
 install(EXPORT cuda_managerConfig DESTINATION ${EXPORT_DIR})
 
 configure_file(saxpy.cu saxpy.cu COPYONLY)
+
+# Standalone compiler installation to compile single kernels
+set(COMPILER_HEADERS cuda_common.h cuda_compiler.h)
+set(COMPILER_INSTALL_DIR /opt/cuda_compiler)
+add_executable(cuda_compiler compiler_main.cpp cuda_compiler.cpp)
+target_link_libraries(cuda_compiler PRIVATE ${CUDA_LIBRARY} ${NVRTC_LIBRARY})
+target_include_directories(cuda_compiler PRIVATE ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
+install(TARGETS cuda_compiler DESTINATION ${COMPILER_INSTALL_DIR})
+install(FILES ${COMPILER_HEADERS} DESTINATION ${COMPILER_INSTALL_DIR})
