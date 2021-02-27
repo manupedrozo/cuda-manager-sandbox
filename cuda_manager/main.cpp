@@ -20,6 +20,12 @@ const char *PTX_PATH        = "saxpy";
 
 using namespace cuda_manager;
 
+void saxpy(float a, float *x, float *y, float *o, float n) {
+    for (int i = 0; i < n; ++i) {
+        o[i] = a * x[i] + y[i];
+    }
+}
+
 void manual_launch_kernel_test() {
   // Initialize cuda manager and compiler
   CudaManager cuda_manager;
@@ -50,7 +56,7 @@ void manual_launch_kernel_test() {
   float a = 2.5f;
   float *hX = new float[n], *hY = new float[n], *hOut = new float[n];
   
-  for (size_t i = 0; i < n; ++i) {
+  for (int i = 0; i < n; ++i) {
     hX[i] = static_cast<float>(i);
     hY[i] = static_cast<float>(i * 2);
   }
@@ -77,8 +83,24 @@ void manual_launch_kernel_test() {
   // Check results
   CUDA_SAFE_CALL(cuMemcpyDtoH(hOut, dOut, buffer_size));
 
-  for (size_t i = 0; i < 10; ++i) { // first 10 results only
+  for (int i = 0; i < 10; ++i) { // first 10 results only
     std::cout << a << " * " << hX[i] << " + " << hY[i] << " = " << hOut[i] << '\n';
+  }
+
+  float *expected = new float[n];
+  saxpy(a, hX, hY, expected, n);
+
+  bool correct = true;
+  for (int i = 0; i < n; ++i) {
+      if (hOut[i] != expected[i]) {
+          printf("Sample host: Incorrect value at %d: got %.2f vs %.2f\n", i, hOut[i], expected[i]);
+          std::cout << "Sample host: Stopping...\n" << std::endl;
+          correct = false;
+          break;
+      }
+  }
+  if(correct) {
+      std::cout << "Sample host: SAXPY correctly performed" << std::endl;
   }
 
   // Free resources
@@ -89,6 +111,7 @@ void manual_launch_kernel_test() {
   delete[] hX;
   delete[] hY;
   delete[] hOut;
+  delete[] expected;
 }
 
 void test_api_string_args() {
@@ -113,7 +136,7 @@ void test_api_string_args() {
   float a = 2.5f;
   float *x = new float[n], *y = new float[n], *o = new float[n];
 
-  for (size_t i = 0; i < n; ++i) {
+  for (int i = 0; i < n; ++i) {
     x[i] = static_cast<float>(i);
     y[i] = static_cast<float>(i * 2);
   }
@@ -155,8 +178,24 @@ void test_api_string_args() {
 
   cuda_api.read_memory(oid, (void *)o, buffer_size);
 
-  for (size_t i = 0; i < 10; ++i) { // first 10 results only
+  for (int i = 0; i < 10; ++i) { // first 10 results only
     std::cout << a << " * " << x[i] << " + " << y[i] << " = " << o[i] << '\n';
+  }
+
+  float *expected = new float[n];
+  saxpy(a, x, y, expected, n);
+
+  bool correct = true;
+  for (int i = 0; i < n; ++i) {
+      if (o[i] != expected[i]) {
+          printf("Sample host: Incorrect value at %d: got %.2f vs %.2f\n", i, o[i], expected[i]);
+          std::cout << "Sample host: Stopping...\n" << std::endl;
+          correct = false;
+          break;
+      }
+  }
+  if(correct) {
+      std::cout << "Sample host: SAXPY correctly performed" << std::endl;
   }
 
   cuda_api.deallocate_kernel(kernel_id);
@@ -167,6 +206,7 @@ void test_api_string_args() {
   delete[] x;
   delete[] y;
   delete[] o;
+  delete[] expected;
 }
 
 void test_api() {
@@ -191,7 +231,7 @@ void test_api() {
   float a = 2.5f;
   float *x = new float[n], *y = new float[n], *o = new float[n];
 
-  for (size_t i = 0; i < n; ++i) {
+  for (int i = 0; i < n; ++i) {
     x[i] = static_cast<float>(i);
     y[i] = static_cast<float>(i * 2);
   }
@@ -240,8 +280,24 @@ void test_api() {
 
   cuda_api.read_memory(oid, (void *)o, buffer_size);
 
-  for (size_t i = 0; i < 10; ++i) { // first 10 results only
+  for (int i = 0; i < 10; ++i) { // first 10 results only
     std::cout << a << " * " << x[i] << " + " << y[i] << " = " << o[i] << '\n';
+  }
+
+  float *expected = new float[n];
+  saxpy(a, x, y, expected, n);
+
+  bool correct = true;
+  for (int i = 0; i < n; ++i) {
+      if (o[i] != expected[i]) {
+          printf("Sample host: Incorrect value at %d: got %.2f vs %.2f\n", i, o[i], expected[i]);
+          std::cout << "Sample host: Stopping...\n" << std::endl;
+          correct = false;
+          break;
+      }
+  }
+  if(correct) {
+      std::cout << "Sample host: SAXPY correctly performed" << std::endl;
   }
 
   cuda_api.deallocate_kernel(kernel_id);
@@ -253,6 +309,7 @@ void test_api() {
   delete[] x;
   delete[] y;
   delete[] o;
+  delete[] expected;
 }
 
 int main(void) {
