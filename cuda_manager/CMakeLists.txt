@@ -52,7 +52,7 @@ configure_file(saxpy.cu saxpy.cu COPYONLY)
 
 # Standalone compiler installation to compile single kernels
 set(COMPILER_HEADERS cuda_common.h cuda_compiler.h)
-set(COMPILER_INSTALL_DIR /opt/cuda_compiler)
+set(COMPILER_INSTALL_DIR ${MANGO_ROOT}/cuda_compiler)
 add_executable(cuda_compiler compiler_main.cpp cuda_compiler.cpp)
 target_link_libraries(cuda_compiler PRIVATE ${CUDA_LIBRARY} ${NVRTC_LIBRARY})
 target_include_directories(cuda_compiler PRIVATE ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})

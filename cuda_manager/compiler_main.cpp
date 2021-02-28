@@ -13,7 +13,9 @@ int main(int argc, char **argv) {
     if(argc > 2) {
         output_path = argv[2];
     } else {
-        output_path = kernel_path.substr(0, kernel_path.find_last_of("."));
+        size_t from = kernel_path.find_last_of("/") + 1;
+        size_t to = kernel_path.find_last_of(".") - from;
+        output_path = kernel_path.substr(from, to);
     }
     
     std::cout << "[Cuda compiler] Compiling: " << kernel_path << " to " << output_path << std::endl;
