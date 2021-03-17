@@ -114,101 +114,6 @@ void manual_launch_kernel_test() {
   delete[] expected;
 }
 
-void test_api_string_args() {
-  CudaApi cuda_api;
-  CudaCompiler cuda_compiler;
-
-  // Compile kernel to ptx
-  char *ptx;
-  size_t ptx_size;
-  cuda_compiler.compile_to_ptx(KERNEL_PATH, &ptx, &ptx_size);
-
-  // Allocate and write ptx
-  int kernel_id = 0;
-  cuda_api.allocate_kernel(kernel_id, ptx_size);
-  cuda_api.write_kernel(kernel_id, (void *) ptx, ptx_size);
-
-  delete[] ptx;
-
-  // Setup input and output buffers
-  size_t n = 100;
-  size_t buffer_size = n * sizeof(float);
-  float a = 2.5f;
-  float *x = new float[n], *y = new float[n], *o = new float[n];
-
-  for (int i = 0; i < n; ++i) {
-    x[i] = static_cast<float>(i);
-    y[i] = static_cast<float>(i * 2);
-  }
-
-  // Allocate and write buffers
-  int xid = 0;
-  int yid = 1;
-  int oid = 2;
-  cuda_api.allocate_memory(xid, buffer_size);
-  cuda_api.allocate_memory(yid, buffer_size);
-  cuda_api.allocate_memory(oid, buffer_size);
-  printf("Allocated buffer x id: %d\n", xid);
-  printf("Allocated buffer y id: %d\n", yid);
-  printf("Allocated buffer o id: %d\n", oid);
-
-  cuda_api.write_memory(xid, (void *) x, buffer_size);
-  cuda_api.write_memory(yid, (void *) y, buffer_size);
-
-  // Set up arguments
-  // Doing it this way to easily convert them to string, in reality you need to manually create the string
-  ValueArg  arg_a = {VALUE, a};
-  BufferArg arg_x = {BUFFER, xid, true};
-  BufferArg arg_y = {BUFFER, yid, true};
-  BufferArg arg_o = {BUFFER, oid, false};
-  ValueArg  arg_n = {VALUE, (float)n};
-
-  std::vector<void *> args {(void *)&arg_a, (void *)&arg_x, (void *)&arg_y, (void *)&arg_o, (void *)&arg_n};
-  
-  // Arguments to a string
-  std::cout << "Arguments to string: \n";
-  std::string _arguments = args_to_string(KERNEL_NAME, kernel_id, args);
-  size_t arg_size = _arguments.size() + 1; // + 1 for null terminator
-  char *arguments = (char *) _arguments.c_str();
-  std::cout << "Arg size: " << arg_size << "\n";
-  std::cout << arguments << "\n";
-
-  // Launch kernel
-  cuda_api.launch_kernel_string_args(arguments, arg_size);
-
-  cuda_api.read_memory(oid, (void *)o, buffer_size);
-
-  for (int i = 0; i < 10; ++i) { // first 10 results only
-    std::cout << a << " * " << x[i] << " + " << y[i] << " = " << o[i] << '\n';
-  }
-
-  float *expected = new float[n];
-  saxpy(a, x, y, expected, n);
-
-  bool correct = true;
-  for (int i = 0; i < n; ++i) {
-      if (o[i] != expected[i]) {
-          printf("Sample host: Incorrect value at %d: got %.2f vs %.2f\n", i, o[i], expected[i]);
-          std::cout << "Sample host: Stopping...\n" << std::endl;
-          correct = false;
-          break;
-      }
-  }
-  if(correct) {
-      std::cout << "Sample host: SAXPY correctly performed" << std::endl;
-  }
-
-  cuda_api.deallocate_kernel(kernel_id);
-  cuda_api.deallocate_memory(xid);
-  cuda_api.deallocate_memory(yid);
-  cuda_api.deallocate_memory(oid);
-
-  delete[] x;
-  delete[] y;
-  delete[] o;
-  delete[] expected;
-}
-
 void test_api() {
   CudaApi cuda_api;
   CudaCompiler cuda_compiler;
@@ -275,8 +180,10 @@ void test_api() {
   *arg_n = {VALUE, (float)n};
   current_arg += sizeof(ValueArg);
 
+  CudaResourceArgs r_args = {0, {NUM_BLOCKS,1,1}, {NUM_THREADS,1,1}};
+ 
   // Launch kernel
-  cuda_api.launch_kernel(kernel_id, KERNEL_NAME, args, arg_count);
+  cuda_api.launch_kernel(kernel_id, KERNEL_NAME, r_args, args, arg_count);
 
   cuda_api.read_memory(oid, (void *)o, buffer_size);
 
@@ -314,6 +221,5 @@ void test_api() {
 
 int main(void) {
   test_api();
-  //test_api_string_args();
   //manual_launch_kernel_test();
 }

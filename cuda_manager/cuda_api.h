@@ -25,19 +25,14 @@ public:
   CudaApiExitCode deallocate_kernel(int kernel_id);
   CudaApiExitCode write_kernel(int kernel_id, const void *data, size_t size);
   
-  // @TODO receive info on blocks and threads
   /*
    * \param kernel_id 
    * \param function_name name of the function to run in the kernel file
+   * \param resource_args device id and grid and block dimensions
    * \param args kernel_arguments array of structs
    * \param arg_count number of arguments in the arguments array
    */
-  CudaApiExitCode launch_kernel(int kernel_id, const char *function_name, const char *args, int arg_count);
-
-  /*
-   * \param args argument string, see cuda_argument_parser.h for syntax
-   */
-  CudaApiExitCode launch_kernel_string_args(const char *args, size_t size);
+  CudaApiExitCode launch_kernel(int kernel_id, const char *function_name, CudaResourceArgs resource_args, const char *args, int arg_count);
 };
 
 #endif

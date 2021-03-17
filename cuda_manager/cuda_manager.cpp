@@ -42,9 +42,10 @@ CudaManager::~CudaManager() {
 }
 
 
-void CudaManager::launch_kernel_from_ptx(const char *ptx, const char* function_name, const char *args, int arg_count, const uint32_t num_blocks, const uint32_t num_threads) {
+//void CudaManager::launch_kernel_from_ptx(const char *ptx, const char* function_name, const char *args, int arg_count, const uint32_t num_blocks, const uint32_t num_threads) {
+void CudaManager::launch_kernel_from_ptx(const char *ptx, const char* function_name, CudaResourceArgs &r_args, const char *args, int arg_count) {
   // Set context where to launch the kernel
-  CUDA_SAFE_CALL(cuCtxSetCurrent(contexts[0])); // TODO just using one context for now
+  CUDA_SAFE_CALL(cuCtxSetCurrent(contexts[r_args.device_id]));
 
   // Load module in current context and get kernel handle
   CUfunction kernel;
@@ -53,14 +54,14 @@ void CudaManager::launch_kernel_from_ptx(const char *ptx, const char* function_n
   CUDA_SAFE_CALL(cuModuleGetFunction(&kernel, module, function_name));
 
   // Launch kernel in current context
-  launch_kernel(kernel, args, arg_count, num_blocks, num_threads);
+  launch_kernel(kernel, r_args, args, arg_count);
 
   // Unload module
   CUDA_SAFE_CALL(cuModuleUnload(module));
 }
 
 
-void CudaManager::launch_kernel(const CUfunction kernel, const char *args, int arg_count, const uint32_t num_blocks, const uint32_t num_threads) {
+void CudaManager::launch_kernel(const CUfunction kernel, CudaResourceArgs &r_args, const char *args, int arg_count) {
   void *kernel_args[arg_count]; // Args to be passed on kernel launch
   std::vector<CudaBuffer*> buffers; // Keep track of buffers 
 
@@ -123,8 +124,8 @@ void CudaManager::launch_kernel(const CUfunction kernel, const char *args, int a
   // Execute
   CUDA_SAFE_CALL(
       cuLaunchKernel(kernel, 
-        num_blocks, 1, 1, // grid dim 
-        num_threads, 1, 1, // block dim
+        r_args.grid_dim.x , r_args.grid_dim.y , r_args.grid_dim.z , // grid dim 
+        r_args.block_dim.x, r_args.block_dim.y, r_args.block_dim.z, // block dim
         0, NULL, // shared mem, stream
         kernel_args, 0) // args, extras
       );

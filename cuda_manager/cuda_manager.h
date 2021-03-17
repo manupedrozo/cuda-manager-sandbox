@@ -6,6 +6,20 @@
 #include <cuda.h>
 #include <vector>
 
+// Dimensions for grid and blocks
+struct CudaDims {
+  uint32_t x;
+  uint32_t y;
+  uint32_t z;
+};
+
+// Resource specific arguments for kernel launch
+struct CudaResourceArgs {
+    int device_id;
+    CudaDims grid_dim;
+    CudaDims block_dim;
+};
+
 namespace cuda_manager {
 
 // Struct to keep track of buffers
@@ -32,10 +46,10 @@ public:
   ~CudaManager();
   
   // Load kernel from a ptx and function name
-  void launch_kernel_from_ptx(const char *ptx, const char* function_name, const char *args, int arg_count, const uint32_t num_blocks, const uint32_t num_threads);
+  void launch_kernel_from_ptx(const char *ptx, const char* function_name, CudaResourceArgs &r_args, const char *args, int arg_count);
 
   // Careful! this function will launch a kernel in the current context, if you are not manually managing contexts, do not use this function directly
-  void launch_kernel(const CUfunction kernel, const char *args, int arg_count, const uint32_t num_blocks, const uint32_t num_threads);
+  void launch_kernel(const CUfunction kernel, CudaResourceArgs &r_args, const char *args, int arg_count);
 };
 
 }

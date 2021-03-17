@@ -123,10 +123,10 @@ Server::DataListenerExitCode CudaServer::handle_data(int id, Server::packet_t pa
     case LAUNCH_KERNEL: {
       launch_kernel_command_t *command = (launch_kernel_command_t *)base;
 
-      CudaApiExitCode err = cuda_api.launch_kernel_string_args((char *)packet.extra_data.buf, packet.extra_data.size);
+      // @TODO should handle string arg parsing here in the server and then use the launch_kernel function
+      //CudaApiExitCode err = cuda_api.launch_kernel_string_args((char *)packet.extra_data.buf, packet.extra_data.size);
 
-      // @TODO there is no data error handling in the server yet
-      assert(err == OK && "Kernel launch error");
+      //assert(err == OK && "Kernel launch error");
 
       logger.info("Kernel launch completed");
 
