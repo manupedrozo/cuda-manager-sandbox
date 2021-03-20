@@ -58,11 +58,11 @@ int main(int argc, char const *argv[]) {
   client.memory_write(yid, (void *) y, buffer_size);
 
   // Doing it this way to easily convert them to string, in reality you need to manually create the string
-  ValueArg  arg_a = {VALUE, a};
+  ScalarArg arg_a = {SCALAR, &a};
   BufferArg arg_x = {BUFFER, xid, true};
   BufferArg arg_y = {BUFFER, yid, true};
   BufferArg arg_o = {BUFFER, oid, false};
-  ValueArg  arg_n = {VALUE, (float)n};
+  ScalarArg arg_n = {SCALAR, &n};
 
   std::vector<void *> args {(void *)&arg_a, (void *)&arg_x, (void *)&arg_y, (void *)&arg_o, (void *)&arg_n};
 

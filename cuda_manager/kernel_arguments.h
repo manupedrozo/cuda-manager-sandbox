@@ -7,16 +7,16 @@ namespace cuda_manager {
 
 enum ArgType {
   BUFFER,
-  VALUE
+  SCALAR
 };
 
 struct Arg {
   ArgType type;
 };
 
-struct ValueArg {
+struct ScalarArg {
   ArgType type;
-  float value;
+  void *ptr;
 };
 
 struct BufferArg {

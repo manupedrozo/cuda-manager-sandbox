@@ -4,6 +4,7 @@
 #include <iostream>
 #include <sstream>
 #include <string.h>
+#include <assert.h>
 
 namespace cuda_manager {
 
@@ -89,6 +90,7 @@ bool parse_integer(int *position, const char *arguments, int *result) {
 }
 
 // @TODO receive size to not depend on correctly terminated strings
+// @TODO SCALAR args are now a pointer, currently unsupported
 bool parse_arguments(const char *arguments, char **parsed_args, int *arg_count, int *kernel_id, char **function_name) {
   std::cout << "Parsing arguments: " << arguments << '\n';
 
@@ -171,6 +173,8 @@ bool parse_arguments(const char *arguments, char **parsed_args, int *arg_count, 
 
       // Number
       else if (is_number) {
+        assert(false && "Scalar args not implemented in parser");
+        /*
         float value = std::stof(current_arg); // TODO support multiple types
 
         size_t new_args_size = args_size + sizeof(ValueArg);
@@ -186,6 +190,7 @@ bool parse_arguments(const char *arguments, char **parsed_args, int *arg_count, 
         args += sizeof(ValueArg);
 
         std::cout << "Number: " << current_arg << '\n';
+        */
       }
 
       // String
@@ -217,10 +222,10 @@ std::string args_to_string(std::string function_name, int kernel_id, std::vector
         ss << " b " << buffer_arg->is_in << ' ' << buffer_arg->id; //<< std::hex << buffer_arg->ptr << std::dec;
         break;
       }
-      case VALUE:
+      case SCALAR:
       {
-        ValueArg *value_arg = (ValueArg *) arg;
-        ss << ' ' << value_arg->value;
+        ScalarArg *scalar_arg = (ScalarArg *) arg;
+        ss << ' ' << scalar_arg->ptr;
         break;
       }
     }

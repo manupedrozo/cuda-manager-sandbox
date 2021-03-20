@@ -103,17 +103,13 @@ void CudaManager::launch_kernel(const CUfunction kernel, CudaResourceArgs &r_arg
         kernel_args[i] = (void *) &cuda_buffer->d_ptr;
         break;
       }
-      case VALUE:
+      case SCALAR:
       {
-        ValueArg *arg = (ValueArg *) base;
-        current_arg += sizeof(ValueArg);
+        ScalarArg *arg = (ScalarArg *) base;
+        current_arg += sizeof(ScalarArg);
 
-        // float only for now
-        std::cout << "Scalar arg: value = " << arg->value << "\n";
-
-        // Use address of the argument in the original array
-        // Might need to allocate memory for the value so arguments can be freed right away
-        kernel_args[i] = &arg->value;
+        std::cout << "Scalar arg: ptr = " << arg->ptr << "\n";
+        kernel_args[i] = arg->ptr;
 
         break;
       }

@@ -5,6 +5,7 @@
 
 namespace cuda_manager {
 
+// TODO NOT CURRENTLY WORKING, SCALAR ARGS NOT SUPPORTED
 /*! \brief Parse arguments from a string.
  * The following syntax is required: {kernel_mem_id kernel_name arguments}
  * arguments:

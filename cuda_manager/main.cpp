@@ -157,12 +157,12 @@ void test_api() {
 
   // Set up arguments
   int arg_count = 5;
-  char *args = (char *) malloc(sizeof(ValueArg) * 2 + sizeof(BufferArg) * 3);
+  char *args = (char *) malloc(sizeof(ScalarArg) * 2 + sizeof(BufferArg) * 3);
   char *current_arg = args;
 
-  ValueArg *arg_a = (ValueArg *) current_arg;
-  *arg_a = {VALUE, a};
-  current_arg += sizeof(ValueArg);
+  ScalarArg *arg_a = (ScalarArg *) current_arg;
+  *arg_a = {SCALAR, &a};
+  current_arg += sizeof(ScalarArg);
 
   BufferArg *arg_x = (BufferArg *) current_arg;
   *arg_x = {BUFFER, xid, true};
@@ -176,9 +176,9 @@ void test_api() {
   *arg_o = {BUFFER, oid, false};
   current_arg += sizeof(BufferArg);
 
-  ValueArg *arg_n = (ValueArg *) current_arg;
-  *arg_n = {VALUE, (float)n};
-  current_arg += sizeof(ValueArg);
+  ScalarArg *arg_n = (ScalarArg *) current_arg;
+  *arg_n = {SCALAR, &n};
+  current_arg += sizeof(ScalarArg);
 
   CudaResourceArgs r_args = {0, {NUM_BLOCKS,1,1}, {NUM_THREADS,1,1}};
  
