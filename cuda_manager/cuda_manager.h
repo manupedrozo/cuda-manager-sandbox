@@ -22,14 +22,6 @@ struct CudaResourceArgs {
 
 namespace cuda_manager {
 
-// Struct to keep track of buffers
-struct CudaBuffer {
-  void *h_ptr; // Ptr to host memory
-  CUdeviceptr d_ptr; // Ptr to device memory
-  size_t size;
-  bool is_in; // Input or output buffer
-};
-
 /*! \brief A class that manages devices, contexts and launches kernels.
  */
 class CudaManager {

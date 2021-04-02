@@ -63,7 +63,7 @@ void CudaManager::launch_kernel_from_ptx(const char *ptx, const char* function_n
 
 void CudaManager::launch_kernel(const CUfunction kernel, CudaResourceArgs &r_args, const char *args, int arg_count) {
   void *kernel_args[arg_count]; // Args to be passed on kernel launch
-  std::vector<CudaBuffer*> buffers; // Keep track of buffers 
+  std::vector<CUdeviceptr *> buffers;
 
   std::cout << "Parsing arguments... [" << arg_count << "]\n";
 
@@ -79,28 +79,17 @@ void CudaManager::launch_kernel(const CUfunction kernel, CudaResourceArgs &r_arg
 
         std::cout << "Buffer arg[1/2]: id = " << arg->id << "  is_in = " << arg->is_in << "\n";
 
-        CudaBuffer *cuda_buffer = new CudaBuffer;
-        buffers.push_back(cuda_buffer);
-
         // Get memory buffer by id
-        MemoryBuffer memory_buffer = memory_manager.get_buffer(arg->id, false);
+        MemoryBuffer memory_buffer = memory_manager.get_buffer(arg->id);
 
-        cuda_buffer->h_ptr = memory_buffer.ptr;
-        cuda_buffer->size  = memory_buffer.size;
-        cuda_buffer->is_in = arg->is_in;
+        std::cout << "Buffer arg[2/2]: size = "  << memory_buffer.size << 
+            "  d_ptr = " << (void *)memory_buffer.d_ptr << "\n";
 
-        CUDA_SAFE_CALL(cuMemAlloc(&cuda_buffer->d_ptr, cuda_buffer->size));
+        CUdeviceptr *cuptr = new CUdeviceptr;
+        *cuptr = memory_buffer.d_ptr;
+        buffers.push_back(cuptr);
 
-        std::cout << "Buffer arg[2/2]: h_ptr = " << cuda_buffer->h_ptr << 
-          "  size = "  << cuda_buffer->size << 
-          "  d_ptr = " << (void *)&cuda_buffer->d_ptr << "\n";
-
-        if (cuda_buffer->is_in) {
-          CUDA_SAFE_CALL(cuMemcpyHtoD(cuda_buffer->d_ptr, cuda_buffer->h_ptr, cuda_buffer->size));
-          std::cout << "Copied HtoD " << cuda_buffer->h_ptr << " to " << cuda_buffer->d_ptr << "\n";
-        }
-
-        kernel_args[i] = (void *) &cuda_buffer->d_ptr;
+        kernel_args[i] = (void *) cuptr;
         break;
       }
       case SCALAR:
@@ -131,15 +120,8 @@ void CudaManager::launch_kernel(const CUfunction kernel, CudaResourceArgs &r_arg
 
   std::cout << "Execution complete!\n";
 
-  // Copy back to host and free host/device memory
-  for (CudaBuffer *cuda_buffer: buffers) {
-    if (!cuda_buffer->is_in) {
-      std::cout << "Copied DtoH " << cuda_buffer->d_ptr << " to " << cuda_buffer->h_ptr << "\n";
-      CUDA_SAFE_CALL(cuMemcpyDtoH(cuda_buffer->h_ptr, cuda_buffer->d_ptr, cuda_buffer->size));
-    }
-    std::cout << "Deallocated " << cuda_buffer->d_ptr << "\n";
-    CUDA_SAFE_CALL(cuMemFree(cuda_buffer->d_ptr));
-    delete cuda_buffer;
+  for (CUdeviceptr *cuptr: buffers) {
+      delete cuptr;
   }
 }
 
