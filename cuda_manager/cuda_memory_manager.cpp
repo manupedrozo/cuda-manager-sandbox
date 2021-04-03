@@ -19,6 +19,8 @@ void CudaMemoryManager::deallocate_kernel(int id) {
     std::map<int, MemoryKernel>::iterator it;
     it = kernels.find(id);
     assert(it != kernels.end() && "Kernel does not exist");
+
+    printf("Deallocated Kernel %p\n", it->second.ptr);
     free(it->second.ptr);
     kernels.erase(it);
 }
@@ -61,7 +63,7 @@ void CudaMemoryManager::deallocate_buffer(int id) {
     it = buffers.find(id);
     assert(it != buffers.end() && "Buffer does not exist");
 
-    printf("Deallocated %p\n", (void *)it->second.d_ptr);
+    printf("Deallocated Buffer %p\n", (void *)it->second.d_ptr);
     CUDA_SAFE_CALL(cuMemFree(it->second.d_ptr));
 
     buffers.erase(it);
