@@ -1,10 +1,33 @@
 #include "cuda_compiler.h"
-#include "cuda_common.h"
-#include <nvrtc.h>
 #include <fstream>
 #include <iostream>
+#include <nvrtc.h>
+#include <cuda.h>
 
-namespace cuda_manager {
+#define CUDA_SAFE_CALL(x)                                         \
+  do {                                                            \
+    CUresult result = x;                                          \
+    if (result != CUDA_SUCCESS) {                                 \
+      const char *msg;                                            \
+      cuGetErrorName(result, &msg);                               \
+      std::cerr << "error: " #x " failed with error "             \
+                << msg << '\n';                                   \
+      exit(1);                                                    \
+    }                                                             \
+  } while(0)
+
+#define NVRTC_SAFE_CALL(x)                                        \
+  do {                                                            \
+    nvrtcResult result = x;                                       \
+    if (result != NVRTC_SUCCESS) {                                \
+      std::cerr << "error: " #x " failed with error "             \
+                << nvrtcGetErrorString(result) << '\n';           \
+      exit(1);                                                    \
+    }                                                             \
+  } while(0)
+
+
+namespace cuda_compiler {
 
 void CudaCompiler::compile_to_ptx(const char *source_path, char **ptx, size_t *ptx_size) {
   std::cout << "Compiling cuda kernel file [" << source_path << "]...\n";

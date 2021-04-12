@@ -21,7 +21,7 @@ int main(int argc, char **argv) {
     std::cout << "[Cuda compiler] Compiling: " << kernel_path << " to " << output_path << std::endl;
 
     // Initialize cuda compiler
-    cuda_manager::CudaCompiler cuda_compiler;
+    cuda_compiler::CudaCompiler cuda_compiler;
 
     // Compile the file to a PTX
     char *ptx;

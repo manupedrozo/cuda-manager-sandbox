@@ -19,6 +19,7 @@ const char *KERNEL_PATH     = "saxpy.cu";
 const char *PTX_PATH        = "saxpy";
 
 using namespace cuda_manager;
+using namespace cuda_compiler;
 
 void saxpy(float a, float *x, float *y, float *o, float n) {
     for (int i = 0; i < n; ++i) {

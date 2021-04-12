@@ -1,6 +1,6 @@
-#include <stdlib.h>
+#include <cstddef>
 
-namespace cuda_manager {
+namespace cuda_compiler {
 
 /*! \brief A class for cuda kernel compilation.
  */

@@ -1,4 +1,4 @@
 cmake_minimum_required (VERSION 2.8.11)
 
+add_subdirectory(cuda_compiler)
 add_subdirectory(cuda_manager)
-add_subdirectory(cuda_daemon)
