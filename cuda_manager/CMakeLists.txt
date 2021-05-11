@@ -28,7 +28,6 @@ message("NVRTC_LIBRARY: ${NVRTC_LIBRARY}")
 message("Include directories: ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}")
 
 # TODO move launch_kernel_test out of cuda_manager as it depends on cuda_compiler
-find_package(cuda_compiler CONFIG REQUIRED HINTS /opt/mango/lib/cmake)
 target_link_libraries(launch_kernel_test PRIVATE ${CUDA_LIBRARY} ${NVRTC_LIBRARY} cuda_compiler cuda_manager)
 
 target_link_libraries(cuda_manager PRIVATE ${CUDA_LIBRARY} ${NVRTC_LIBRARY})
