@@ -1,5 +1,7 @@
 #include "cuda_api.h"
+#include "cuda_memory_manager.h"
 #include "cuda_argument_parser.h"
+#include <assert.h>
 
 CudaApi::CudaApi():cuda_manager() {}
 
@@ -38,19 +40,19 @@ CudaApiExitCode CudaApi::deallocate_kernel(int kernel_id) {
   return OK;
 }
 
-CudaApiExitCode CudaApi::write_kernel(int kernel_id, const void *data, size_t size) {
-  cuda_manager.memory_manager.write_kernel(kernel_id, data, size);
+CudaApiExitCode CudaApi::write_kernel(int kernel_id, const char *function_name, const void *data, size_t size) {
+  cuda_manager.memory_manager.write_kernel(kernel_id, function_name, data, size);
   return OK;
 }
 
-CudaApiExitCode CudaApi::launch_kernel(int kernel_id, const char *function_name, CudaResourceArgs r_args, const char *args, int arg_count) {
-  // Get ptx using kernel_id
-  char *ptx = (char *) cuda_manager.memory_manager.get_kernel(kernel_id).ptr;
+CudaApiExitCode CudaApi::launch_kernel(int kernel_id, CudaResourceArgs r_args, const char *args, int arg_count) {
+  // Get writtenl kernel using kernel_id
+  cuda_manager::MemoryKernel mem_kernel = cuda_manager.memory_manager.get_kernel(kernel_id);
+  assert(mem_kernel.kernel != nullptr && "Kernel isn't loaded, perform kernel_write() before launching");
 
   // Launch kernel
-  //std::cout << "Launching kernel from ptx: \n" << ptx << "\n";
-  std::cout << "Function name " << function_name << "\n";
-  std::cout << "Resources: device_id:" 
+  std::cout << "Launching kernel " << kernel_id << "\n";
+  std::cout << "Resources: device_id: " 
             << r_args.device_id << ",  Grid(" 
             << r_args.grid_dim.x << ", " 
             << r_args.grid_dim.y << ", " 
@@ -59,7 +61,8 @@ CudaApiExitCode CudaApi::launch_kernel(int kernel_id, const char *function_name,
             << r_args.block_dim.y << ", "  
             << r_args.block_dim.z << ")\n"; 
   std::cout << "Number of arguments: " << arg_count << "\n";
-  cuda_manager.launch_kernel_from_ptx(ptx, function_name, r_args, args, arg_count);
+
+  cuda_manager.launch_kernel(mem_kernel.kernel, r_args, args, arg_count);
 
   return OK;
 }

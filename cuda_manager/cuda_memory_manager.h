@@ -3,6 +3,7 @@
 #include <map>
 #include <string.h>
 #include <cuda.h>
+#include "cuda_common.h"
 
 
 namespace cuda_manager {
@@ -18,7 +19,8 @@ struct MemoryBuffer {
 struct MemoryKernel {
   int id;
   size_t size;
-  void *ptr; // Ptr to host memory
+  CUfunction kernel;
+  CUmodule module;
 };
 
 class CudaMemoryManager {
@@ -33,7 +35,7 @@ public:
 
   void allocate_kernel(int id, size_t size);
   void deallocate_kernel(int id);
-  void write_kernel(int id, const void *data, size_t size);
+  void write_kernel(int id, const char *function_name, const void *data, size_t size);
   MemoryKernel get_kernel(int id);
 
   void allocate_buffer(int id, size_t size);

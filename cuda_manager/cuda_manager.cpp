@@ -32,6 +32,7 @@ CudaManager::CudaManager(): memory_manager() {
     // Initialize context for device
     CUDA_SAFE_CALL(cuCtxCreate(&contexts[i], i, devices[i]));
   }
+  CUDA_SAFE_CALL(cuCtxSetCurrent(contexts[0]));
 }
 
 CudaManager::~CudaManager() {
@@ -42,7 +43,6 @@ CudaManager::~CudaManager() {
 }
 
 
-//void CudaManager::launch_kernel_from_ptx(const char *ptx, const char* function_name, const char *args, int arg_count, const uint32_t num_blocks, const uint32_t num_threads) {
 void CudaManager::launch_kernel_from_ptx(const char *ptx, const char* function_name, CudaResourceArgs &r_args, const char *args, int arg_count) {
   // Set context where to launch the kernel
   CUDA_SAFE_CALL(cuCtxSetCurrent(contexts[r_args.device_id]));
@@ -62,6 +62,7 @@ void CudaManager::launch_kernel_from_ptx(const char *ptx, const char* function_n
 
 
 void CudaManager::launch_kernel(const CUfunction kernel, CudaResourceArgs &r_args, const char *args, int arg_count) {
+  CUDA_SAFE_CALL(cuCtxSetCurrent(contexts[r_args.device_id]));
   void *kernel_args[arg_count]; // Args to be passed on kernel launch
   std::vector<CUdeviceptr *> buffers;
 

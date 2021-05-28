@@ -127,7 +127,7 @@ void test_api() {
   // Allocate and write ptx
   int kernel_id = 0;
   cuda_api.allocate_kernel(kernel_id, ptx_size);
-  cuda_api.write_kernel(kernel_id, (void *) ptx, ptx_size);
+  cuda_api.write_kernel(kernel_id, KERNEL_NAME, (void *) ptx, ptx_size);
 
   delete[] ptx;
 
@@ -184,7 +184,7 @@ void test_api() {
   CudaResourceArgs r_args = {0, {NUM_BLOCKS,1,1}, {NUM_THREADS,1,1}};
  
   // Launch kernel
-  cuda_api.launch_kernel(kernel_id, KERNEL_NAME, r_args, args, arg_count);
+  cuda_api.launch_kernel(kernel_id, r_args, args, arg_count);
 
   cuda_api.read_memory(oid, (void *)o, buffer_size);
 

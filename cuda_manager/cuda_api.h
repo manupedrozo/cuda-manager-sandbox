@@ -23,7 +23,7 @@ public:
 
   CudaApiExitCode allocate_kernel(int kernel_id, size_t size);
   CudaApiExitCode deallocate_kernel(int kernel_id);
-  CudaApiExitCode write_kernel(int kernel_id, const void *data, size_t size);
+  CudaApiExitCode write_kernel(int kernel_id, const char *function_name, const void *data, size_t size);
   
   /*
    * \param kernel_id 
@@ -32,7 +32,7 @@ public:
    * \param args kernel_arguments array of structs
    * \param arg_count number of arguments in the arguments array
    */
-  CudaApiExitCode launch_kernel(int kernel_id, const char *function_name, CudaResourceArgs resource_args, const char *args, int arg_count);
+  CudaApiExitCode launch_kernel(int kernel_id, CudaResourceArgs resource_args, const char *args, int arg_count);
 };
 
 #endif
