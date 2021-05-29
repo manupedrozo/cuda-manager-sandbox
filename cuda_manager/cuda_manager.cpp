@@ -66,7 +66,9 @@ void CudaManager::launch_kernel(const CUfunction kernel, CudaResourceArgs &r_arg
   void *kernel_args[arg_count]; // Args to be passed on kernel launch
   std::vector<CUdeviceptr *> buffers;
 
+#ifndef NDEBUG
   std::cout << "Parsing arguments... [" << arg_count << "]\n";
+#endif
 
   const char *current_arg = args;
   for (int i = 0; i < arg_count; ++i) {
@@ -78,13 +80,17 @@ void CudaManager::launch_kernel(const CUfunction kernel, CudaResourceArgs &r_arg
         BufferArg *arg = (BufferArg *) base; 
         current_arg += sizeof(BufferArg);
 
+#ifndef NDEBUG
         std::cout << "Buffer arg[1/2]: id = " << arg->id << "  is_in = " << arg->is_in << "\n";
+#endif
 
         // Get memory buffer by id
         MemoryBuffer memory_buffer = memory_manager.get_buffer(arg->id);
 
+#ifndef NDEBUG
         std::cout << "Buffer arg[2/2]: size = "  << memory_buffer.size << 
             "  d_ptr = " << (void *)memory_buffer.d_ptr << "\n";
+#endif
 
         CUdeviceptr *cuptr = new CUdeviceptr;
         *cuptr = memory_buffer.d_ptr;
@@ -98,7 +104,9 @@ void CudaManager::launch_kernel(const CUfunction kernel, CudaResourceArgs &r_arg
         ScalarArg *arg = (ScalarArg *) base;
         current_arg += sizeof(ScalarArg);
 
+#ifndef NDEBUG
         std::cout << "Scalar arg: ptr = " << arg->ptr << "\n";
+#endif
         kernel_args[i] = arg->ptr;
 
         break;
@@ -106,7 +114,9 @@ void CudaManager::launch_kernel(const CUfunction kernel, CudaResourceArgs &r_arg
     }
   }
 
+#ifndef NDEBUG
   std::cout << "Executing...\n";
+#endif
   // Execute
   CUDA_SAFE_CALL(
       cuLaunchKernel(kernel, 
@@ -119,7 +129,9 @@ void CudaManager::launch_kernel(const CUfunction kernel, CudaResourceArgs &r_arg
   // Synchronize
   CUDA_SAFE_CALL(cuCtxSynchronize());
 
+#ifndef NDEBUG
   std::cout << "Execution complete!\n";
+#endif
 
   for (CUdeviceptr *cuptr: buffers) {
       delete cuptr;

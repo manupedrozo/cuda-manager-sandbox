@@ -51,6 +51,7 @@ CudaApiExitCode CudaApi::launch_kernel(int kernel_id, CudaResourceArgs r_args, c
   assert(mem_kernel.kernel != nullptr && "Kernel isn't loaded, perform kernel_write() before launching");
 
   // Launch kernel
+#ifndef NDEBUG
   std::cout << "Launching kernel " << kernel_id << "\n";
   std::cout << "Resources: device_id: " 
             << r_args.device_id << ",  Grid(" 
@@ -61,6 +62,7 @@ CudaApiExitCode CudaApi::launch_kernel(int kernel_id, CudaResourceArgs r_args, c
             << r_args.block_dim.y << ", "  
             << r_args.block_dim.z << ")\n"; 
   std::cout << "Number of arguments: " << arg_count << "\n";
+#endif
 
   cuda_manager.launch_kernel(mem_kernel.kernel, r_args, args, arg_count);
 
