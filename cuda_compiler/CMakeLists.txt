@@ -2,6 +2,10 @@ cmake_minimum_required (VERSION 2.8.11)
 
 project(compiler LANGUAGES CXX CUDA)
 
+if (NOT MANGO_ROOT) 
+    message(FATAL_ERROR "You have to specify -DMANGO_ROOT=\"/path/to/mango\"!")
+endif (NOT MANGO_ROOT)
+
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Debug" CACHE STRING "Choose debug or release" FORCE)
 endif(NOT CMAKE_BUILD_TYPE)
@@ -9,7 +13,6 @@ endif(NOT CMAKE_BUILD_TYPE)
 message(STATUS "[Compiler] Generated with config types: ${CMAKE_CONFIGURATION_TYPES}")
 message(STATUS "[Compiler] Build type: ${CMAKE_BUILD_TYPE}")
 
-set(MANGO_ROOT /opt/mango)
 set(INCLUDE_DIR ${MANGO_ROOT}/include/cuda_compiler)
 set(LIB_DIR ${MANGO_ROOT}/lib/cuda_compiler)
 set(EXPORT_DIR ${MANGO_ROOT}/lib/cmake/cuda_compiler)
